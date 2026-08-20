@@ -67,10 +67,17 @@ final class TaskStore {
 
     init(persistence: Persistence? = .default) {
         self.persistence = persistence
-        if let saved = persistence?.load() {
+        switch persistence?.load() {
+        case .loaded(let saved):
             items = saved.items
             done = saved.done
-        } else {
+        case .failed:
+            // The unreadable file was moved aside by load(). Start empty instead of
+            // masking the failure with demo data, and write nothing until the user
+            // does — so the backup stays the only copy of their data.
+            items = []
+            done = []
+        case .missing, nil:
             let seed = TaskStore.seed()
             items = seed.items
             done = seed.done

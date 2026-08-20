@@ -48,6 +48,16 @@ struct Snapshot: Codable {
 
 /// JSON file persistence in ~/Library/Application Support/MenuBarToDo/tasks.json.
 struct Persistence {
+    /// Outcome of `load()`: a missing file (genuine first launch) must be treated
+    /// differently from an existing file that can't be read — seeding over the
+    /// latter would destroy the user's (possibly recoverable) data.
+    enum LoadResult {
+        case loaded(Snapshot)
+        case missing
+        /// File exists but couldn't be read/decoded; it was moved aside first.
+        case failed
+    }
+
     let url: URL
 
     static var `default`: Persistence {
@@ -57,13 +67,27 @@ struct Persistence {
         return Persistence(url: dir.appendingPathComponent("tasks.json"))
     }
 
-    func load() -> Snapshot? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
+    func load() -> LoadResult {
+        guard FileManager.default.fileExists(atPath: url.path) else { return .missing }
         do {
-            return try JSONDecoder().decode(Snapshot.self, from: data)
+            let data = try Data(contentsOf: url)
+            return .loaded(try JSONDecoder().decode(Snapshot.self, from: data))
         } catch {
-            NSLog("MenuBarToDo: could not decode \(url.path): \(error)")
-            return nil
+            NSLog("MenuBarToDo: could not load \(url.path): \(error)")
+            backUpUnreadableFile()
+            return .failed
+        }
+    }
+
+    /// Moves the unreadable file aside so no later save can overwrite it.
+    private func backUpUnreadableFile() {
+        let backup = url.deletingPathExtension()
+            .appendingPathExtension("corrupt-\(Int(Date().timeIntervalSince1970)).json")
+        do {
+            try FileManager.default.moveItem(at: url, to: backup)
+            NSLog("MenuBarToDo: moved unreadable file to \(backup.path)")
+        } catch {
+            NSLog("MenuBarToDo: could not back up unreadable file: \(error)")
         }
     }
 
