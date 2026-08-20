@@ -137,6 +137,9 @@ private struct RowView: View {
         HStack(alignment: .top, spacing: 8) {
             DragHandle(task: task)
                 .opacity(completing ? 0 : 1)
+                // A zero-opacity view still hit-tests; don't let the invisible grip
+                // start a drag on a row that is about to be removed.
+                .allowsHitTesting(!completing)
 
             Button(action: complete) {
                 ZStack {
@@ -279,7 +282,13 @@ private struct ListDropDelegate: DropDelegate {
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        guard let id = store.dragID, let slot = frames.slot(at: info.location) else { return false }
+        guard let id = store.dragID, let slot = frames.slot(at: info.location) else {
+            // Don't leave the session's drag state armed after a failed drop —
+            // a stale dragID would accept the next unrelated plain-text drag
+            // and move this task wherever that lands.
+            store.clearDrag()
+            return false
+        }
         store.move(id, to: slot)
         return true
     }
