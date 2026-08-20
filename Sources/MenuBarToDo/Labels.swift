@@ -65,10 +65,10 @@ struct DueLabel: Equatable {
     /// Mirrors the design: overdue → "Überfällig" (red), today → "Heute" (blue),
     /// tomorrow → "Morgen", within a week → weekday ("Fr."), else absolute date.
     /// In absolute mode everything is "20. Aug", only the colors remain.
-    static func make(for day: Day, style: DateFormatStyle) -> DueLabel {
-        let dd = day.days(since: .today)
+    static func make(for day: Day, style: DateFormatStyle, today: Day = .today) -> DueLabel {
+        let dd = day.days(since: today)
         let abs = style == .absolute
-        let absText = German.absolute(day)
+        let absText = German.absolute(day, today: today)
         if dd < 0 { return DueLabel(text: abs ? absText : "Überfällig", tone: .overdue) }
         if dd == 0 { return DueLabel(text: abs ? absText : "Heute", tone: .today) }
         if dd == 1, !abs { return DueLabel(text: "Morgen", tone: .neutral) }

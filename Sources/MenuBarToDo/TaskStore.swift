@@ -58,6 +58,12 @@ final class TaskStore {
     var draft = Draft()
     var filter: TaskFilter = .none
 
+    /// The current calendar day as *observable* state. Date-derived UI (groups,
+    /// due labels, filters) reads this instead of Day.today so it re-derives when
+    /// the day rolls over while the long-running app is open.
+    private(set) var today: Day = .today
+    @ObservationIgnored private var dayChangeObserver: NSObjectProtocol?
+
     // Drag & drop
     var dragID: UUID?
     /// Where the dragged task would land right now (nil when not over a target).
@@ -83,6 +89,21 @@ final class TaskStore {
             done = seed.done
             persistence?.save(seed)
         }
+        dayChangeObserver = NotificationCenter.default.addObserver(forName: .NSCalendarDayChanged,
+                                                                   object: nil, queue: .main) { [weak self] _ in
+            self?.refreshToday()
+        }
+    }
+
+    deinit {
+        if let dayChangeObserver { NotificationCenter.default.removeObserver(dayChangeObserver) }
+    }
+
+    /// Re-reads the current day (the notification can be missed during sleep,
+    /// so `panelWillOpen` calls this too).
+    private func refreshToday() {
+        let now = Day.today
+        if today != now { today = now }
     }
 
     // MARK: - Derived
@@ -96,14 +117,14 @@ final class TaskStore {
 
     /// Sorted items that pass the active filter — what the list shows.
     var filteredItems: [TodoTask] {
-        sortedItems.filter { filter.matches($0) }
+        sortedItems.filter { filter.matches($0, today: today) }
     }
 
     var groups: [TaskGroup] {
         var order: [String] = []
         var buckets: [String: (label: DueLabel, due: Day, rows: [TodoTask])] = [:]
         for item in filteredItems {
-            let label = DueLabel.make(for: item.due, style: settings.dateFormat)
+            let label = DueLabel.make(for: item.due, style: settings.dateFormat, today: today)
             if buckets[label.text] == nil {
                 buckets[label.text] = (label, item.due, [])
                 order.append(label.text)
@@ -123,6 +144,7 @@ final class TaskStore {
     // MARK: - Navigation
 
     func panelWillOpen() {
+        refreshToday()
         clearDrag()
     }
 
