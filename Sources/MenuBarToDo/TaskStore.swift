@@ -235,14 +235,16 @@ final class TaskStore {
     func complete(_ id: UUID) {
         guard let task = items.first(where: { $0.id == id }) else { return }
         items.removeAll { $0.id == id }
-        done.insert(DoneTask(id: task.id, title: task.title, createdAt: task.createdAt, completedAt: .today), at: 0)
+        done.insert(DoneTask(id: task.id, title: task.title, details: task.details,
+                             createdAt: task.createdAt, completedAt: .today), at: 0)
         persist()
     }
 
     func restore(_ id: UUID) {
         guard let task = done.first(where: { $0.id == id }) else { return }
         done.removeAll { $0.id == id }
-        items.append(TodoTask(id: task.id, title: task.title, due: .today, createdAt: task.createdAt ?? .today))
+        items.append(TodoTask(id: task.id, title: task.title, details: task.details ?? "",
+                              due: .today, createdAt: task.createdAt ?? .today))
         persist()
     }
 

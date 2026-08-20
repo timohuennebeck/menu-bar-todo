@@ -34,6 +34,8 @@ struct TodoTask: Identifiable, Codable, Equatable {
 struct DoneTask: Identifiable, Codable, Equatable {
     var id: UUID
     var title: String
+    /// Kept so restoring a task brings its description back (nil for legacy files).
+    var details: String? = nil
     /// Kept so restoring a task brings its original creation date back.
     var createdAt: Day?
     /// Shown as "Erledigt am …" in the done list (nil only for legacy files).

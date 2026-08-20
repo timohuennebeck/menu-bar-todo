@@ -118,7 +118,8 @@ final class TaskStoreTests: XCTestCase {
 
     func testCompleteAndRestore() {
         let store = makeStore()
-        let task = store.sortedItems[0]
+        let task = store.sortedItems[1] // "Design-Review vorbereiten" — has a description
+        XCTAssertFalse(task.details.isEmpty, "test needs a task with a description")
         let doneBefore = store.done.count
         store.complete(task.id)
         XCTAssertNil(store.items.first { $0.id == task.id })
@@ -130,7 +131,7 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(store.done.count, doneBefore)
         let restored = store.items.first { $0.id == task.id }
         XCTAssertEqual(restored?.due, .today, "restored tasks are due today")
-        XCTAssertEqual(restored?.details, "")
+        XCTAssertEqual(restored?.details, task.details, "description survives complete → restore")
         XCTAssertEqual(restored?.createdAt, task.createdAt, "creation date survives complete → restore")
     }
 
