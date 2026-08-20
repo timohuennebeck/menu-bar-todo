@@ -95,7 +95,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func statusItemClicked(_ sender: Any?) {
-        if NSApp.currentEvent?.type == .rightMouseUp {
+        let event = NSApp.currentEvent
+        // Right-click or Control-click (the trackpad/one-button equivalent) opens
+        // the context menu — the app's only quit affordance.
+        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
             showContextMenu()
             return
         }

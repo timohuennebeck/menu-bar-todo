@@ -145,6 +145,9 @@ struct PrimaryButton: View {
         }
         .buttonStyle(.plain)
         .pointerCursor()
+        // Not just dimmed: a hit-testable "disabled" button with a pointer cursor
+        // that swallows the click reads as broken.
+        .disabled(!enabled)
         .opacity(enabled ? 1 : 0.4)
         .animation(.easeOut(duration: 0.12), value: enabled)
         .padding(.top, 2)
