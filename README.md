@@ -6,22 +6,25 @@ from an `NSStatusItem`), implemented from the Claude Design file **Menu Bar To-D
 Why a custom panel instead of `NSPopover`: the popover animates size changes on its own clock and
 tears its window down when content animates while it resizes, which showed as a flicker when a
 row slid out. `PanelWindowController` sets the window frame directly (top-anchored, vibrancy,
-12 pt radius, shadow, no arrow — matching the design) and only eases it while a row collapses.
+12 pt radius, shadow, no arrow — matching the design); while a row collapses it follows the
+animating content, coalesced to one frame update per display cycle so nothing jitters.
 
 - Lives only in the menu bar (no Dock icon, no windows). Click the list icon to open the panel; click anywhere else to dismiss.
 - Open tasks grouped by due date (Überfällig / Heute / Morgen / weekday / date), drag & drop between groups or rows.
   The insertion line previews the exact slot (top half of a row → before it, bottom half → after it, group header → first, group end → last).
 - Filter menu above the list: Kein Filter / Überfällig / Heute (range tasks count as "Heute" while today is inside the range).
 - Web-like affordances: pointing-hand cursor on everything clickable, grab cursor on drag handles, clicking outside a text field unfocuses it.
-- Add / edit tasks with title, description, "Heute"/"Morgen" chips and a 5-month calendar with single-day or range selection.
+- Add / edit tasks with title, description, "Heute"/"Morgen" chips and a scrollable calendar with single-day or
+  range selection (current month + four ahead, widened so the current selection is always reachable).
 - Checking a task off plays a check animation + a synthesized two-note chime (`Sound.swift`, no asset); after 0.6 s the row
   fades out (0.2 s), then collapses to zero height (0.25 s, its group header too if it was the last row) and is removed only
   once invisible — no jump, no flicker. The collapse is an `Animatable` modifier so layout really interpolates and the panel
   window follows it frame by frame.
 - Drag tasks by their grip handle (the six dots); a single list-level drop target computes the slot from the pointer.
 - Tasks without a description show "Erstellt am …"; the "Erledigt" list shows "Erledigt am …" and restores with one tap.
-- Tasks persist as JSON in `~/Library/Application Support/MenuBarToDo/tasks.json` (seeded with the design's sample data on first launch).
-- Right-click the status item → *Menu Bar To-Do beenden* to quit.
+- Tasks persist as JSON in `~/Library/Application Support/MenuBarToDo/tasks.json` (seeded with the design's sample
+  data on first launch). A file that fails to load is moved aside as `tasks.corrupt-<timestamp>.json` — never overwritten.
+- Right-click (or Control-click) the status item → *Menu Bar To-Do beenden* to quit.
 
 Requires macOS 14+ and Xcode 15+ (built with Xcode 26.5 / Swift 6.3).
 
