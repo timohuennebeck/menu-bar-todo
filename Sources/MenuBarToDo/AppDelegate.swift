@@ -83,9 +83,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
-            let image = NSImage(systemSymbolName: "list.bullet", accessibilityDescription: "To-Do")
-            image?.isTemplate = true
-            button.image = image
+            if let image = NSImage(systemSymbolName: "list.bullet", accessibilityDescription: "To-Do") {
+                image.isTemplate = true
+                button.image = image
+            } else {
+                // Never leave an invisible status item — it is the app's only entry point.
+                button.title = "✓"
+                NSLog("MenuBarToDo: status icon symbol unavailable; falling back to a text title")
+            }
             button.toolTip = "Menu Bar To-Do"
             button.target = self
             button.action = #selector(statusItemClicked(_:))

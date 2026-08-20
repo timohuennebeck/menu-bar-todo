@@ -16,10 +16,20 @@ final class CompletionSound {
         if let format {
             engine.connect(player, to: engine.mainMixerNode, format: format)
             buffer = CompletionSound.renderChime(format: format)
+            if buffer == nil { NSLog("MenuBarToDo: could not render the chime; using the system sound") }
         } else {
             buffer = nil
+            NSLog("MenuBarToDo: could not create the audio format; using the system sound")
         }
         engine.prepare()
+        // An output-device change (headphones, AirPods, docking) tears the graph
+        // down while isRunning can still read true; stop the engine so the next
+        // play() restarts it against the new configuration instead of scheduling
+        // into a dead player forever.
+        NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange,
+                                               object: engine, queue: .main) { [engine] _ in
+            engine.stop()
+        }
     }
 
     func play() {
@@ -27,6 +37,7 @@ final class CompletionSound {
         do {
             if !engine.isRunning { try engine.start() }
         } catch {
+            NSLog("MenuBarToDo: could not start the audio engine (\(error)); using the system sound")
             playFallback()
             return
         }
@@ -36,7 +47,10 @@ final class CompletionSound {
     }
 
     private func playFallback() {
-        NSSound(named: "Glass")?.play()
+        let sound = NSSound(named: "Glass")
+        if sound?.play() != true {
+            NSLog("MenuBarToDo: completion-sound fallback failed (NSSound 'Glass' \(sound == nil ? "missing" : "did not play"))")
+        }
     }
 
     /// Two partial-rich sine notes with a 6 ms attack and exponential decay,
