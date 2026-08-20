@@ -13,8 +13,14 @@ enum German {
     static func weekday(_ d: Day) -> String { weekdaysShort[d.weekday - 1] }
     static func monthShort(_ d: Day) -> String { monthsShort[d.month - 1] }
 
-    /// "20. Aug"
-    static func absolute(_ d: Day) -> String { "\(d.dayOfMonth). \(monthShort(d))" }
+    /// "20. Aug"; the year is appended once it differs from the current one
+    /// ("20. Aug 2027"). Besides being clearer, this keeps two days a year apart
+    /// from sharing a due label — the label text is the list's grouping key, and
+    /// a merged group would silently re-date tasks dragged inside it.
+    static func absolute(_ d: Day, today: Day = .today) -> String {
+        let base = "\(d.dayOfMonth). \(monthShort(d))"
+        return d.year == today.year ? base : "\(base) \(d.year)"
+    }
 
     /// "Heute" / "Morgen" / "27. Aug" for a single day, "3. – 9. Sept" or
     /// "28. Aug – 3. Sept" for a range.
@@ -33,21 +39,17 @@ enum German {
 
     /// "Mi, 20. Aug 2026"
     static func long(_ d: Day) -> String {
-        "\(weekday(d)), \(absolute(d)) \(d.year)"
+        "\(weekday(d)), \(d.dayOfMonth). \(monthShort(d)) \(d.year)"
     }
 
     /// "Erstellt am 20. Aug" — the year is added once it differs from the current one.
     static func created(_ d: Day, today: Day = .today) -> String {
-        "Erstellt am " + dateWithYearIfNeeded(d, today: today)
+        "Erstellt am " + absolute(d, today: today)
     }
 
     /// "Erledigt am 20. Aug"
     static func completed(_ d: Day, today: Day = .today) -> String {
-        "Erledigt am " + dateWithYearIfNeeded(d, today: today)
-    }
-
-    private static func dateWithYearIfNeeded(_ d: Day, today: Day) -> String {
-        d.year == today.year ? absolute(d) : "\(absolute(d)) \(d.year)"
+        "Erledigt am " + absolute(d, today: today)
     }
 }
 
