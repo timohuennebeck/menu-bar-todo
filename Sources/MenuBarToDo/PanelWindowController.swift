@@ -27,6 +27,9 @@ final class PanelWindowController {
     private var anchorTopRight: NSPoint = .zero
     /// Last size PanelView reported; used to size the window before it is shown.
     private var contentSize: CGSize = .zero
+    /// Latest shrink frame waiting for the coalesced apply (see `resize`).
+    private var pendingFrame: NSRect?
+    private var applyScheduled = false
 
     /// Called when the panel closed for any reason (outside click, Esc, …).
     var onClose: (() -> Void)?
@@ -104,6 +107,7 @@ final class PanelWindowController {
 
     func close() {
         guard window.isVisible else { return }
+        pendingFrame = nil // drop any coalesced resize still in flight
         removeMonitors()
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.10
@@ -132,9 +136,10 @@ final class PanelWindowController {
         guard window.isVisible || !display else { return } // remember only; place it on show()
         let w = ceil(size.width), h = ceil(size.height)
         let frame = NSRect(x: anchorTopRight.x - w, y: anchorTopRight.y - h, width: w, height: h)
-        guard window.frame != frame else { return }
+        guard window.frame != frame else { pendingFrame = nil; return }
         if PanelWindowController.logsSizes { NSLog("panel resize → %.0f×%.0f%@", w, h, animated ? " (animated)" : "") }
         if animated, window.isVisible {
+            pendingFrame = nil
             NSAnimationContext.runAnimationGroup({ ctx in
                 ctx.duration = duration
                 ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -142,7 +147,29 @@ final class PanelWindowController {
             }, completionHandler: { [window] in
                 window.invalidateShadow()
             })
+        } else if window.isVisible, frame.height < window.frame.height {
+            // Shrinking while shown — the row-collapse case. The size reader fires on
+            // every frame of the layout animation, and applying each report with a
+            // synchronous setFrame *inside* SwiftUI's update (moving origin and height
+            // at once) jittered the whole panel, most visibly the static header.
+            // Coalesce to one setFrame per runloop turn, applied after the layout pass
+            // so the window and the freshly rendered content move together.
+            pendingFrame = frame
+            guard !applyScheduled else { return }
+            applyScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.applyScheduled = false
+                guard let frame = self.pendingFrame else { return }
+                self.pendingFrame = nil
+                guard self.window.isVisible, self.window.frame != frame else { return }
+                self.window.setFrame(frame, display: true, animate: false)
+                self.window.invalidateShadow()
+            }
         } else {
+            // Growing (or placing before show): apply immediately so taller content
+            // is never clipped, not even for a frame. Discrete events — no jitter risk.
+            pendingFrame = nil
             window.setFrame(frame, display: display, animate: false)
             window.invalidateShadow()
         }
