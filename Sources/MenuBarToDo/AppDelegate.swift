@@ -5,7 +5,14 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var panel: PanelWindowController?
-    private let store = TaskStore()
+    /// Preview/debug runs never touch the real tasks.json: routes like "empty" and
+    /// "complete-anim" mutate the store destructively, and the next persist() would
+    /// write that over the user's data.
+    private static let isPreviewRun: Bool = {
+        let env = ProcessInfo.processInfo.environment
+        return env["MENUBAR_TODO_PREVIEW_WINDOW"] == "1" || env["MENUBAR_TODO_PREVIEW_ROUTE"] != nil
+    }()
+    private lazy var store = TaskStore(persistence: Self.isPreviewRun ? nil : .default)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Accessory apps have no Dock icon and don't take over the menu bar.
