@@ -35,8 +35,19 @@ final class PanelWindowController {
     var onClose: (() -> Void)?
     /// Asked before Esc closes the panel; return false to let SwiftUI handle it (e.g. cancel a form).
     var shouldCloseOnEscape: () -> Bool = { true }
+    /// Clicks the dismissal monitors must NOT treat as "outside" — the status
+    /// item's own button, whose mouse-up toggles the panel. Without this, the
+    /// mouse-*down* monitor closed the panel first and the mouse-up saw it as
+    /// closed and reopened it: the icon could never dismiss the panel.
+    var shouldIgnoreClick: (NSEvent) -> Bool = { _ in false }
 
-    var isShown: Bool { window.isVisible }
+    /// True while the close fade-out runs; the panel is already "closed" for
+    /// toggling purposes then.
+    private var isClosing = false
+    /// Invalidates in-flight close completions when the panel is re-shown.
+    private var closeGeneration = 0
+
+    var isShown: Bool { window.isVisible && !isClosing }
     var windowNumber: Int { window.windowNumber }
 
     init(rootView: some View) {
@@ -80,6 +91,8 @@ final class PanelWindowController {
 
     /// Shows the panel hanging from `anchor` (a screen rect, e.g. the status item button).
     func show(below anchor: NSRect) {
+        isClosing = false
+        closeGeneration += 1 // a pending close completion must not hide this show
         let screen = NSScreen.screens.first { $0.frame.intersects(anchor) } ?? NSScreen.main
         let bounds = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let top = min(anchor.minY, bounds.maxY) - PanelWindowController.topGap
@@ -106,15 +119,21 @@ final class PanelWindowController {
     }
 
     func close() {
-        guard window.isVisible else { return }
+        guard isShown else { return }
+        isClosing = true
+        closeGeneration += 1
+        let generation = closeGeneration
         pendingFrame = nil // drop any coalesced resize still in flight
         removeMonitors()
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.10
             window.animator().alphaValue = 0
-        }, completionHandler: { [window] in
-            window.orderOut(nil)
-            window.alphaValue = 1
+        }, completionHandler: { [weak self] in
+            // Superseded by a show() mid-fade → leave the fresh panel alone.
+            guard let self, self.closeGeneration == generation else { return }
+            self.isClosing = false
+            self.window.orderOut(nil)
+            self.window.alphaValue = 1
         })
         onClose?()
     }
@@ -199,7 +218,7 @@ final class PanelWindowController {
                 }
                 return event
             case .leftMouseDown, .rightMouseDown, .otherMouseDown:
-                if event.window !== self.window { self.close() }
+                if event.window !== self.window, !self.shouldIgnoreClick(event) { self.close() }
                 return event
             default:
                 return event
@@ -225,5 +244,9 @@ final class PanelWindowController {
         eventMonitors.removeAll()
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers.removeAll()
+    }
+
+    deinit {
+        removeMonitors()
     }
 }

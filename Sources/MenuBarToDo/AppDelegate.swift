@@ -128,6 +128,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         })
         .environment(store)
         let panel = PanelWindowController(rootView: root)
+        // The status item's own button toggles the panel on mouse-up; the outside-click
+        // monitor must not close it on the mouse-down first (that made the click reopen it).
+        panel.shouldIgnoreClick = { [weak self] event in
+            event.window === self?.statusItem?.button?.window
+        }
         // Esc inside a form cancels the form (SwiftUI's onExitCommand); elsewhere it closes the panel.
         panel.shouldCloseOnEscape = { [weak self] in
             guard let self else { return true }
