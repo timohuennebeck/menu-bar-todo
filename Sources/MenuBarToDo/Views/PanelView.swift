@@ -9,12 +9,15 @@ struct PanelView: View {
     var onSizeChange: ((CGSize) -> Void)? = nil
 
     var body: some View {
-        // Outer VStack + Spacer keeps the panel top-aligned if the window is momentarily
-        // taller than the content, without making the root greedy for sizeThatFits.
-        VStack(spacing: 0) {
-            panel
-            Spacer(minLength: 0)
-        }
+        // Pin the content to the window's top edge in both directions. The window follows
+        // the reported size a beat later, so the content can momentarily be taller than
+        // the window (e.g. switching to the add form) — an oversized root view would be
+        // *centered* by NSHostingView, cutting the header off at the top. A top-aligned
+        // flexible frame keeps the root at the proposed size and clips overflow at the
+        // bottom instead. (Under an unconstrained proposal it still reports the content's
+        // ideal size, so sizeThatFits keeps working.)
+        panel
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var panel: some View {
