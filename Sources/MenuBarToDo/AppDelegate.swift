@@ -72,6 +72,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
+    /// A check-off only persists ~1 s after the click (once its animation ends);
+    /// quitting inside that window must not lose an already-confirmed completion.
+    func applicationWillTerminate(_ notification: Notification) {
+        store.flushPendingCompletions()
+    }
+
     // MARK: - Status item
 
     private func configureStatusItem() {

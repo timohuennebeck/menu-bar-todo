@@ -232,6 +232,16 @@ final class TaskStore {
         }
     }
 
+    /// Completes every task whose check-off animation is still playing. Called on
+    /// quit: the user already saw the checkmark and heard the chime, so the
+    /// completion must not be lost with the pending timers.
+    func flushPendingCompletions() {
+        for id in completingIDs { complete(id) }
+        completingIDs.removeAll()
+        fadingIDs.removeAll()
+        collapsingIDs.removeAll()
+    }
+
     func complete(_ id: UUID) {
         guard let task = items.first(where: { $0.id == id }) else { return }
         items.removeAll { $0.id == id }
