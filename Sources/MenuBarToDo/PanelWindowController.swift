@@ -91,6 +91,7 @@ final class PanelWindowController {
         ])
         window.contentView = effect
     }
+
     // MARK: - Shape
 
     /// Resizable rounded-rect mask for the effect view: the corners stay fixed and the
@@ -108,7 +109,6 @@ final class PanelWindowController {
         return image
     }()
 
-
     // MARK: - Show / hide
 
     /// Shows the panel hanging from `anchor` (a screen rect, e.g. the status item button).
@@ -123,12 +123,16 @@ final class PanelWindowController {
         right = max(right, bounds.minX + PanelWindowController.edgeInset + Theme.panelWidth)
         anchorTopRight = NSPoint(x: right, y: top)
 
-        // Size to the content before the first frame is drawn. Prefer the size SwiftUI
-        // last reported; fall back to asking the hosting controller (height 0 → ideal).
-        let size = contentSize.height > 0
-            ? contentSize
-            : host.sizeThatFits(in: NSSize(width: Theme.panelWidth, height: 0))
-        resize(to: size, display: false)
+        // Size to the content before the first frame is drawn. PanelView reports its size
+        // from its first layout pass, which normally already happened when the hosting
+        // view joined the window. If show() comes before that pass, run it now — the
+        // report lands in `contentSize` synchronously. (The root view always adopts the
+        // proposed size, so the hosting controller's sizeThatFits can't measure it.)
+        if contentSize.height == 0 {
+            host.view.layoutSubtreeIfNeeded()
+        }
+        if contentSize.height > 0 { resize(to: contentSize, display: false) }
+        if PanelWindowController.logsSizes { NSLog("panel window #%ld at %@", window.windowNumber, NSStringFromRect(window.frame)) }
 
         window.alphaValue = 0
         window.orderFrontRegardless()
@@ -184,13 +188,16 @@ final class PanelWindowController {
             }, completionHandler: { [window] in
                 window.invalidateShadow()
             })
-        } else if window.isVisible, frame.height < window.frame.height {
-            // Shrinking while shown — the row-collapse case. The size reader fires on
-            // every frame of the layout animation, and applying each report with a
-            // synchronous setFrame *inside* SwiftUI's update (moving origin and height
-            // at once) jittered the whole panel, most visibly the static header.
-            // Coalesce to one setFrame per runloop turn, applied after the layout pass
-            // so the window and the freshly rendered content move together.
+        } else if window.isVisible {
+            // Resizing while shown. The size reader fires from *inside* SwiftUI's update
+            // (every frame of a layout animation, or once for a route change), and a
+            // synchronous setFrame there re-enters AppKit layout with the hosting view
+            // mid-update: when the panel grew, the hosting view came out taller than the
+            // window by the growth (853 for a 583 window), hanging out above the top edge
+            // — header clipped, blank strip at the bottom, until the next state change.
+            // While shrinking it merely jittered. Coalesce to one setFrame per runloop
+            // turn, applied after the layout pass, so the window and the freshly laid-out
+            // content move together and AppKit lays the hosting view out exactly once.
             pendingFrame = frame
             guard !applyScheduled else { return }
             applyScheduled = true
@@ -204,8 +211,7 @@ final class PanelWindowController {
                 self.window.invalidateShadow()
             }
         } else {
-            // Growing (or placing before show): apply immediately so taller content
-            // is never clipped, not even for a frame. Discrete events — no jitter risk.
+            // Placing before show: nothing is on screen yet, apply immediately.
             pendingFrame = nil
             window.setFrame(frame, display: display, animate: false)
             window.invalidateShadow()
