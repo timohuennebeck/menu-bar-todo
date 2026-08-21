@@ -167,19 +167,28 @@ private struct RowView: View {
             .help("Als erledigt markieren")
             .accessibilityLabel("Als erledigt markieren")
 
-            VStack(alignment: .leading, spacing: 1) {
+            // Title / description (if any) / due line — always ends with the due line.
+            VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(completing ? Theme.muted : Theme.ink)
                     .strikethrough(completing, color: Theme.muted)
                     .lineSpacing(2)
-                if store.settings.showDescriptions {
-                    // Description if there is one, otherwise the creation date.
-                    Text(task.details.isEmpty ? German.created(task.createdAt) : task.details)
+                if store.settings.showDescriptions, !task.details.isEmpty {
+                    Text(task.details)
                         .font(.system(size: 11.5))
                         .foregroundStyle(Theme.muted)
                         .lineSpacing(2)
                 }
+                let due = DueLabel.row(for: task.due, task.due2, style: store.settings.dateFormat, today: store.today)
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 10, weight: .medium))
+                    Text(due.text)
+                        .font(.system(size: 11.5))
+                }
+                .foregroundStyle(Theme.tone(due.tone))
+                .padding(.top, 1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

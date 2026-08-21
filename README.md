@@ -11,8 +11,10 @@ animating content, coalesced to one frame update per display cycle so nothing ji
 
 - Lives only in the menu bar (no Dock icon, no windows). Click the clipboard icon to open the panel; click anywhere else to dismiss.
 - Open tasks grouped by due date (Überfällig / Heute / Morgen / weekday / date), drag & drop between groups or rows.
+  Range tasks sit under "Heute" while the range is running.
   The insertion line previews the exact slot (top half of a row → before it, bottom half → after it, group header → first, group end → last).
-- Filter menu above the list: Kein Filter / Überfällig / Heute (range tasks count as "Heute" while today is inside the range).
+- Filter menu above the list: Kein Filter / Überfällig / Heute / Datum vorhanden (range tasks count as "Heute" while
+  today is inside the range; "Datum vorhanden" hides undated tasks).
 - Web-like affordances: pointing-hand cursor on everything clickable, grab cursor on drag handles, clicking outside a text field unfocuses it.
 - Add / edit tasks with title, description and a due-date chip that opens a scrollable calendar with single-day or
   range selection (current month + four ahead, widened so the current selection is always reachable); clicking
@@ -22,7 +24,10 @@ animating content, coalesced to one frame update per display cycle so nothing ji
   once invisible — no jump, no flicker. The collapse is an `Animatable` modifier so layout really interpolates and the panel
   window follows it frame by frame.
 - Drag tasks by their grip handle (the six dots); a single list-level drop target computes the slot from the pointer.
-- Tasks without a description show "Erstellt am …"; the "Erledigt" list shows "Erledigt am …" and restores with one tap.
+- Each row shows title, description (if any) and a due line — Todoist-style: Gestern / Heute / Morgen, the weekday
+  ("Freitag") within the next six days, otherwise the date ("Do, 21. Aug"); ranges show their dates
+  ("Mo, 24. – So, 30. Aug"), undated tasks "Kein Fälligkeitsdatum"; overdue red, today blue. The due date is optional — "Kein Datum" in the calendar popup removes it and the task
+  lists last under "Kein Datum". The "Erledigt" list shows "Erledigt am …" and restores with one tap.
 - Tasks persist as JSON in `~/Library/Application Support/MenuBarToDo/tasks.json` (seeded with the design's sample
   data on first launch). A file that fails to load is moved aside as `tasks.corrupt-<timestamp>.json` — never overwritten.
 - Global keyboard shortcuts (work from any app, no Accessibility permission needed): **⇧⌘O** shows/hides the panel,
@@ -56,13 +61,13 @@ Sources/MenuBarToDo/
   main.swift                       NSApplication bootstrap
   AppDelegate.swift                status item, main menu, debug preview window
   PanelWindowController.swift      borderless floating panel (sizing, transient dismissal, Esc)
+  HotKey.swift                     global shortcuts (KeyCombo + Carbon RegisterEventHotKey wrapper)
   Day.swift                        calendar-day value type ("yyyy-MM-dd" in JSON)
   Models.swift                     TodoTask / DoneTask, JSON persistence, design-time settings
   Labels.swift                     German date labels (port of the design's fmt / rangeText)
   Sound.swift                      synthesized completion chime (AVAudioEngine)
   TaskStore.swift                  @Observable store: tasks, routing, draft, drag state
   Views/Theme.swift                design tokens + shared controls (chips, buttons, insertion line)
-  HotKey.swift                     global shortcuts (KeyCombo + Carbon RegisterEventHotKey wrapper)
   Views/PanelView.swift            root switch (list / add / edit / done) + footer + empty state
   Views/TaskListView.swift         grouped list, drag & drop delegates, drop-zone styles
   Views/TaskFormView.swift         add / edit form

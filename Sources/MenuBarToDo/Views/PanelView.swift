@@ -9,15 +9,19 @@ struct PanelView: View {
     var onSizeChange: ((CGSize) -> Void)? = nil
 
     var body: some View {
-        // Pin the content to the window's top edge in both directions. The window follows
-        // the reported size a beat later, so the content can momentarily be taller than
-        // the window (e.g. switching to the add form) — an oversized root view would be
-        // *centered* by NSHostingView, cutting the header off at the top. A top-aligned
-        // flexible frame keeps the root at the proposed size and clips overflow at the
-        // bottom instead. (Under an unconstrained proposal it still reports the content's
-        // ideal size, so sizeThatFits keeps working.)
+        // The root adopts *exactly* the size the hosting view proposes, content pinned to
+        // the top. The window follows the reported size one runloop turn later (see
+        // PanelWindowController.resize), so for that one layout pass the content can be
+        // taller than the window, e.g. when the calendar opens. Without `minHeight: 0` a
+        // flexible frame grows to its child instead, and NSHostingView *centers* an
+        // oversized root — the header would slide up out of view for that pass. Clamped,
+        // the overflow is simply clipped at the bottom until the window catches up.
+        //
+        // Consequence: the hosting controller's sizeThatFits can't measure the content
+        // any more (it returns whatever height is proposed); PanelWindowController.show()
+        // forces a layout pass and reads the reported size instead.
         panel
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .top)
     }
 
     private var panel: some View {
@@ -46,11 +50,16 @@ struct PanelView: View {
         .frame(width: Theme.panelWidth)
         .fixedSize(horizontal: false, vertical: true)
         // Clicking any non-interactive area (labels, padding, background) ends text editing,
-        // like blurring an input on the web. Buttons/rows/fields in front still win the tap.
+        // like blurring an input on the web, and collapses the calendar — it is a popup and
+        // a click outside it dismisses it. Buttons/rows/fields in front still win the tap;
+        // the calendar card swallows taps inside itself so they don't land here.
         .background(
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture { NSApp.keyWindow?.makeFirstResponder(nil) }
+                .onTapGesture {
+                    NSApp.keyWindow?.makeFirstResponder(nil)
+                    store.closeCalendar()
+                }
         )
         .background(
             GeometryReader { geo in
@@ -77,7 +86,7 @@ struct ListHeaderView: View {
             Menu {
                 Picker("Filter", selection: $store.filter) {
                     ForEach(TaskFilter.allCases) { f in
-                        Text(f.rawValue).tag(f)
+                        Text("\(f.rawValue) (\(store.count(for: f)))").tag(f)
                     }
                 }
                 .pickerStyle(.inline)
@@ -162,9 +171,14 @@ struct FooterView: View {
 
     var body: some View {
         HStack {
-            if store.route.isEdit {
+            switch store.route {
+            case .edit:
                 LinkButton(title: "Task löschen", kind: .danger) { store.deleteEditingTask() }
-            } else {
+            case .add:
+                // The form's own submit button already says "Task hinzufügen"; a second
+                // one in the footer would be a duplicate that just reopens the same form.
+                EmptyView()
+            case .list, .done:
                 LinkButton(title: "+ Task hinzufügen") { store.openAdd() }
             }
             Spacer(minLength: 0)

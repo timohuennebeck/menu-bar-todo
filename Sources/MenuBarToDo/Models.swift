@@ -4,13 +4,14 @@ struct TodoTask: Identifiable, Codable, Equatable {
     var id: UUID
     var title: String
     var details: String
-    var due: Day
-    /// Optional end of a date range ("Zeitraum").
+    /// nil = no due date ("Kein Fälligkeitsdatum"); such tasks list last.
+    var due: Day?
+    /// Optional end of a date range ("Zeitraum"); only meaningful with a `due`.
     var due2: Day?
     /// Shown as "Erstellt am …" when the task has no description.
     var createdAt: Day
 
-    init(id: UUID = UUID(), title: String, details: String = "", due: Day, due2: Day? = nil, createdAt: Day = .today) {
+    init(id: UUID = UUID(), title: String, details: String = "", due: Day? = nil, due2: Day? = nil, createdAt: Day = .today) {
         self.id = id
         self.title = title
         self.details = details
@@ -125,6 +126,7 @@ enum TaskFilter: String, CaseIterable, Identifiable {
     case none = "Kein Filter"
     case overdue = "Überfällig"
     case today = "Heute"
+    case dated = "Datum vorhanden"
 
     var id: String { rawValue }
     var isActive: Bool { self != .none }
@@ -132,10 +134,10 @@ enum TaskFilter: String, CaseIterable, Identifiable {
     /// Range tasks (due…due2) count as "Heute" while today lies inside the range
     /// and only become overdue once the whole range is in the past.
     func matches(_ task: TodoTask, today: Day = .today) -> Bool {
-        let start = task.due
-        let end = task.due2 ?? task.due
+        guard let start = task.due else { return self == .none }
+        let end = task.due2 ?? start
         switch self {
-        case .none: return true
+        case .none, .dated: return true
         case .overdue: return end < today
         case .today: return start <= today && today <= end
         }

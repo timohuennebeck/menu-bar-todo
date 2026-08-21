@@ -34,6 +34,7 @@ struct TaskFormView: View {
                     .overlay(focusRing(titleFocused))
                     .focused($titleFocused)
                     .onSubmit { store.submitDraft() }
+                    .simultaneousGesture(TapGesture().onEnded { store.closeCalendar() })
 
                 ZStack(alignment: .topLeading) {
                     TextEditor(text: $store.draft.details)
@@ -57,14 +58,15 @@ struct TaskFormView: View {
                 }
                 .background(fieldBackground(focused: detailsFocused), in: RoundedRectangle(cornerRadius: 9))
                 .overlay(focusRing(detailsFocused))
+                // Clicking into a field is a click outside the calendar: collapse it. A
+                // simultaneous gesture leaves the field's own click handling untouched.
+                .simultaneousGesture(TapGesture().onEnded { store.closeCalendar() })
 
                 VStack(alignment: .leading, spacing: 6) {
                     SectionLabel(text: "Fällig")
                     HStack(spacing: 6) {
-                        ForEach(quickChips, id: \.day) { chip in
-                            Chip(title: chip.title) { store.selectDue(chip.day) }
-                        }
-                        Chip(title: German.rangeText(store.draft.due, store.draft.due2), style: .accent) {
+                        Chip(title: store.draft.due.map { German.rangeText($0, store.draft.due2) } ?? "Kein Datum",
+                             style: .accent) {
                             store.toggleCalendar()
                         }
                         Spacer(minLength: 0)
@@ -86,12 +88,6 @@ struct TaskFormView: View {
             // The popover becomes key a beat after it appears; defer focus accordingly.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { titleFocused = true }
         }
-    }
-
-    /// "Heute" / "Morgen" shortcuts — the currently selected one is hidden (as in the design).
-    private var quickChips: [(title: String, day: Day)] {
-        [("Heute", Day.today), ("Morgen", Day.today.adding(1))]
-            .filter { $0.day != store.draft.due }
     }
 
     private func fieldBackground(focused: Bool) -> Color {

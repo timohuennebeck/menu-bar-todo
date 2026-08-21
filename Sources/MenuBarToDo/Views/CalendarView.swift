@@ -46,7 +46,7 @@ struct CalendarView: View {
                 .scrollIndicators(.never)
                 .frame(maxHeight: Theme.calendarMaxHeight)
                 // Land on the selection's month, not blindly on the current one.
-                .onAppear { proxy.scrollTo(store.draft.due.firstOfMonth(offset: 0), anchor: .top) }
+                .onAppear { proxy.scrollTo((store.draft.due ?? .today).firstOfMonth(offset: 0), anchor: .top) }
             }
             .padding(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
 
@@ -55,6 +55,9 @@ struct CalendarView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.muted2)
                 Spacer(minLength: 0)
+                if store.draft.due != nil {
+                    LinkButton(title: "Kein Datum", kind: .muted) { store.clearDue() }
+                }
                 if store.draft.due2 != nil {
                     IconButton(symbol: "↺", help: "Zurücksetzen",
                                tint: Theme.blue, hoverTint: Theme.blue,
@@ -67,12 +70,18 @@ struct CalendarView: View {
         }
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5))
+        // Taps on the card's own chrome (weekday row, month label, gaps between days)
+        // must not fall through to the panel background, which would collapse the
+        // calendar. Day cells and buttons sit in front and still win.
+        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .onTapGesture {}
         .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
     }
 
     private var rangeHint: String {
+        guard let start = store.draft.due else { return "Kein Fälligkeitsdatum" }
         if let end = store.draft.due2 {
-            return "Zeitraum " + German.rangeText(store.draft.due, end)
+            return German.rangeSummary(start, end, today: store.today)
         }
         return "Enddatum wählen"
     }
@@ -88,9 +97,10 @@ struct CalendarView: View {
     /// task must show (and let the user re-pick) its actual due date, and a range
     /// ending beyond the default window must stay reachable.
     private var months: [Month] {
-        let start = min(store.draft.due, .today).firstOfMonth(offset: 0)
+        let selection = store.draft.due ?? .today
+        let start = min(selection, .today).firstOfMonth(offset: 0)
         let end = max(Day.today.firstOfMonth(offset: 4),
-                      (store.draft.due2 ?? store.draft.due).firstOfMonth(offset: 0))
+                      (store.draft.due2 ?? selection).firstOfMonth(offset: 0))
         let span = Day.calendar.dateComponents([.month], from: start.date, to: end.date).month ?? 4
         return (0...max(span, 0)).map { offset in
             let first = start.firstOfMonth(offset: offset)
@@ -108,7 +118,10 @@ private struct DayCell: View {
     var body: some View {
         let draft = store.draft
         let selected = day == draft.due || day == draft.due2
-        let inRange = draft.due2.map { day > draft.due && day < $0 } ?? false
+        let inRange: Bool = {
+            guard let start = draft.due, let end = draft.due2 else { return false }
+            return day > start && day < end
+        }()
         let isToday = day == .today
         let isPast = day < .today
 

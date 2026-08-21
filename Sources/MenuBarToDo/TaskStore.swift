@@ -21,7 +21,8 @@ enum Route: Equatable {
 struct Draft {
     var title = ""
     var details = ""
-    var due: Day = .today
+    /// New tasks default to today; nil = no due date (cleared in the calendar popup).
+    var due: Day? = .today
     var due2: Day? = nil
     var calendarOpen = false
 
@@ -30,8 +31,10 @@ struct Draft {
 
 struct TaskGroup: Identifiable {
     let label: DueLabel
-    /// Due date of the first row (used for the Kopfzeile/Rahmen drop-zone styles).
-    let due: Day
+    /// The group's day (what a task dropped into it is re-dated to); for "Heute" that
+    /// is today even when its first row is a range that started earlier. nil for the
+    /// "Kein Datum" group.
+    let due: Day?
     let rows: [TodoTask]
     var id: String { label.text }
 }
@@ -113,10 +116,31 @@ final class TaskStore {
     // MARK: - Derived
 
     /// Stable sort by due date (insertion order preserved within a day).
+    /// The day a task sorts and groups under. A range that is already running
+    /// (start < today ≤ end) belongs to "Heute", not "Überfällig" — the same rule
+    /// the "Heute" filter applies — so it anchors on today instead of its start.
+    func anchorDay(_ task: TodoTask) -> Day? {
+        guard let due = task.due else { return nil }
+        if let end = task.due2, due < today, today <= end { return today }
+        return due
+    }
+
+    /// Dated tasks by day, undated ones last; ties keep the user's order.
     var sortedItems: [TodoTask] {
         items.enumerated()
-            .sorted { a, b in a.element.due != b.element.due ? a.element.due < b.element.due : a.offset < b.offset }
+            .sorted { a, b in
+                let da = anchorDay(a.element), db = anchorDay(b.element)
+                guard da != db else { return a.offset < b.offset }
+                guard let da else { return false }
+                guard let db else { return true }
+                return da < db
+            }
             .map(\.element)
+    }
+
+    /// How many open tasks `filter` would show — the "(3)" in the filter menu.
+    func count(for filter: TaskFilter) -> Int {
+        items.reduce(0) { $0 + (filter.matches($1, today: today) ? 1 : 0) }
     }
 
     /// Sorted items that pass the active filter — what the list shows.
@@ -126,11 +150,12 @@ final class TaskStore {
 
     var groups: [TaskGroup] {
         var order: [String] = []
-        var buckets: [String: (label: DueLabel, due: Day, rows: [TodoTask])] = [:]
+        var buckets: [String: (label: DueLabel, due: Day?, rows: [TodoTask])] = [:]
         for item in filteredItems {
-            let label = DueLabel.make(for: item.due, style: settings.dateFormat, today: today)
+            let anchor = anchorDay(item)
+            let label = anchor.map { DueLabel.make(for: $0, style: settings.dateFormat, today: today) } ?? .undated
             if buckets[label.text] == nil {
-                buckets[label.text] = (label, item.due, [])
+                buckets[label.text] = (label, anchor, [])
                 order.append(label.text)
             }
             buckets[label.text]?.rows.append(item)
@@ -303,9 +328,14 @@ final class TaskStore {
         let insertBefore = index < neighbors.count
         let anchor = insertBefore ? neighbors[index] : neighbors[neighbors.count - 1]
 
+        // Landing next to a task of another day re-dates the moved task to that day
+        // (the neighbor's *anchor*: next to a running range that is today, not the
+        // range's start; nil in "Kein Datum"). Same day → the dates stay, so a running
+        // range stays a range.
         var moved = dragged
-        if moved.due != anchor.due {
-            moved.due = anchor.due
+        let target = anchorDay(anchor)
+        if anchorDay(moved) != target {
+            moved.due = target
             moved.due2 = nil
         }
         var rest = items.filter { $0.id != dragID }
@@ -317,14 +347,9 @@ final class TaskStore {
 
     // MARK: - Draft helpers
 
-    func selectDue(_ day: Day) {
-        draft.due = day
-        draft.due2 = nil
-    }
-
     /// Calendar tap: first tap sets the start, a later tap after it sets the end.
     func selectCalendarDay(_ day: Day) {
-        if draft.due2 == nil, day > draft.due {
+        if let start = draft.due, draft.due2 == nil, day > start {
             draft.due2 = day
         } else {
             draft.due = day
@@ -333,7 +358,20 @@ final class TaskStore {
     }
 
     func clearRange() { draft.due2 = nil }
+
+    /// "Kein Datum" in the calendar popup: the task gets no due date at all.
+    func clearDue() {
+        draft.due = nil
+        draft.due2 = nil
+        draft.calendarOpen = false
+    }
     func toggleCalendar() { draft.calendarOpen.toggle() }
+
+    /// Collapses the calendar; called for any click outside it (panel background,
+    /// focusing a text field). A no-op while closed so it doesn't churn the form.
+    func closeCalendar() {
+        if draft.calendarOpen { draft.calendarOpen = false }
+    }
 
     // MARK: - Drag state
 
@@ -402,6 +440,15 @@ final class TaskStore {
             draft.calendarOpen = true
         case "edit":
             if let first = sortedItems.first { openEdit(first) }
+        case "range":
+            // A running range, a range ahead, and an undated task — every due-line shape.
+            items.insert(TodoTask(title: "Messe-Vorbereitung", due: Day.today.adding(-1), due2: Day.today.adding(4)), at: 0)
+            items.append(TodoTask(title: "Urlaub", details: "Bergwandern", due: Day.today.adding(8), due2: Day.today.adding(14)))
+            items.append(TodoTask(title: "Ideen für Q4 sammeln"))
+        case "undated":
+            items.append(TodoTask(title: "Ideen für Q4 sammeln"))
+            items.append(TodoTask(title: "Keller aufräumen", details: "Irgendwann im Herbst"))
+            items.removeAll { $0.due != nil } // leaves just the "Kein Datum" group
         case "done":
             goDone()
         case "empty":

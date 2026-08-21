@@ -4,6 +4,7 @@ import Foundation
 enum German {
     /// Indexed by Foundation weekday (1 = Sunday).
     static let weekdaysShort = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"]
+    static let weekdaysLong = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"]
     static let monthsShort = ["Jan", "Feb", "März", "Apr", "Mai", "Juni", "Juli", "Aug", "Sept", "Okt", "Nov", "Dez"]
     static let monthsLong = ["Januar", "Februar", "März", "April", "Mai", "Juni",
                              "Juli", "August", "September", "Oktober", "November", "Dezember"]
@@ -11,6 +12,7 @@ enum German {
     static let calendarHeader = ["MO", "DI", "MI", "DO", "FR", "SA", "SO"]
 
     static func weekday(_ d: Day) -> String { weekdaysShort[d.weekday - 1] }
+    static func weekdayLong(_ d: Day) -> String { weekdaysLong[d.weekday - 1] }
     static func monthShort(_ d: Day) -> String { monthsShort[d.month - 1] }
 
     /// "20. Aug"; the year is appended once it differs from the current one
@@ -37,14 +39,33 @@ enum German {
         return "\(start) – \(absolute(b))"
     }
 
+    /// Calendar hint once a range is picked: "7 Tage · bis So, 9. Sept" — the chip
+    /// already shows both dates, so this adds the length and the end's weekday instead.
+    static func rangeSummary(_ a: Day, _ b: Day, today: Day = .today) -> String {
+        let days = b.days(since: a) + 1 // inclusive: 3.–9. is seven days
+        return "\(days) Tage · \(rangeEnd(b, today: today))"
+    }
+
+    /// "bis So, 9. Sept"
+    static func rangeEnd(_ end: Day, today: Day = .today) -> String {
+        "bis \(weekday(end)), \(absolute(end, today: today))"
+    }
+
+    /// Concrete dates for a row's due line: "Do, 21. Aug", "Mo, 24. – So, 30. Aug",
+    /// "Fr, 28. Aug – Do, 3. Sept", or "Kein Fälligkeitsdatum". (`DueLabel.row` wraps
+    /// this with the relative words — Heute, Morgen, Freitag — for near single days.)
+    static func dueDates(_ due: Day?, _ due2: Day?, today: Day = .today) -> String {
+        guard let due else { return "Kein Fälligkeitsdatum" }
+        let start = "\(weekday(due)), \(due.dayOfMonth)."
+        guard let end = due2, end != due else { return "\(weekday(due)), \(absolute(due, today: today))" }
+        let sameMonth = due.month == end.month && due.year == end.year
+        let from = sameMonth ? start : "\(weekday(due)), \(absolute(due, today: today))"
+        return "\(from) – \(weekday(end)), \(absolute(end, today: today))"
+    }
+
     /// "Mi, 20. Aug 2026"
     static func long(_ d: Day) -> String {
         "\(weekday(d)), \(d.dayOfMonth). \(monthShort(d)) \(d.year)"
-    }
-
-    /// "Erstellt am 20. Aug" — the year is added once it differs from the current one.
-    static func created(_ d: Day, today: Day = .today) -> String {
-        "Erstellt am " + absolute(d, today: today)
     }
 
     /// "Erledigt am 20. Aug"
@@ -62,6 +83,9 @@ struct DueLabel: Equatable {
     let text: String
     let tone: DueTone
 
+    /// Group header for tasks without a due date; they list last.
+    static let undated = DueLabel(text: "Kein Datum", tone: .neutral)
+
     /// Mirrors the design: overdue → "Überfällig" (red), today → "Heute" (blue),
     /// tomorrow → "Morgen", within a week → weekday ("Fr."), else absolute date.
     /// In absolute mode everything is "20. Aug", only the colors remain.
@@ -74,5 +98,28 @@ struct DueLabel: Equatable {
         if dd == 1, !abs { return DueLabel(text: "Morgen", tone: .neutral) }
         if dd < 7, !abs { return DueLabel(text: German.weekday(day) + ".", tone: .neutral) }
         return DueLabel(text: absText, tone: .neutral)
+    }
+
+    /// The due line under a list row, Todoist-style: "Gestern" / "Heute" / "Morgen", the
+    /// full weekday ("Freitag") for the six days after tomorrow, otherwise the date
+    /// ("Do, 21. Aug"). Ranges always show their dates; no date → "Kein Fälligkeitsdatum".
+    /// The tone matches the group headers: overdue red, today blue, else neutral.
+    static func row(for due: Day?, _ due2: Day?, style: DateFormatStyle, today: Day = .today) -> DueLabel {
+        guard let due else { return DueLabel(text: German.dueDates(nil, nil, today: today), tone: .neutral) }
+        let dates = German.dueDates(due, due2, today: today)
+        if let end = due2, end != due {
+            let tone: DueTone = end < today ? .overdue : (due <= today ? .today : .neutral)
+            return DueLabel(text: dates, tone: tone)
+        }
+        let dd = due.days(since: today)
+        let tone: DueTone = dd < 0 ? .overdue : dd == 0 ? .today : .neutral
+        guard style == .relative else { return DueLabel(text: dates, tone: tone) }
+        switch dd {
+        case -1: return DueLabel(text: "Gestern", tone: tone)
+        case 0: return DueLabel(text: "Heute", tone: tone)
+        case 1: return DueLabel(text: "Morgen", tone: tone)
+        case 2...6: return DueLabel(text: German.weekdayLong(due), tone: tone)
+        default: return DueLabel(text: dates, tone: tone)
+        }
     }
 }
