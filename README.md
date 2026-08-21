@@ -10,6 +10,7 @@ row slid out. `PanelWindowController` sets the window frame directly (top-anchor
 animating content, coalesced to one frame update per display cycle so nothing jitters.
 
 - Lives only in the menu bar (no Dock icon, no windows). Click the clipboard icon to open the panel; click anywhere else to dismiss.
+  The icon carries a badge with the number of tasks due today or overdue ("9+" past nine; none when there are zero).
 - Open tasks grouped by due date (Überfällig / Heute / Morgen / weekday, then by month: "Später im August", "September", "Januar 2027"), drag & drop between groups or rows.
   Month groups fold up on a header click ("September (3)"); the collapsed set is saved with the tasks.
   Range tasks sit under "Heute" while the range is running.

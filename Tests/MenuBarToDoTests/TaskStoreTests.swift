@@ -208,6 +208,24 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(saved.collapsedMonths, [group.collapseKey!], "1999-01 has no group any more")
     }
 
+    // MARK: Status-bar badge
+
+    func testBadgeCountsTodayAndOverdue() {
+        let store = makeStore() // seed: one overdue, one today, the rest later
+        XCTAssertEqual(store.badgeCount, 2)
+        let today = store.items.first { $0.due == store.today }!
+        store.complete(today.id)
+        XCTAssertEqual(store.badgeCount, 1, "checking off today's task drops the badge")
+        store.restore(today.id) // restored tasks are due today again
+        XCTAssertEqual(store.badgeCount, 2)
+    }
+
+    func testBadgeIgnoresFutureAndUndatedTasks() {
+        let store = makeStore()
+        for task in store.items where task.due == nil || task.due! > store.today { store.complete(task.id) }
+        XCTAssertEqual(store.badgeCount, 2, "future/undated tasks never counted")
+    }
+
     func testAddRequiresTitleAndReturnsToList() {
         let store = makeStore()
         let before = store.items.count
@@ -557,4 +575,36 @@ final class TaskStoreTests: XCTestCase {
 
 private func date(_ y: Int, _ m: Int, _ d: Int) -> Date {
     Calendar.current.date(from: DateComponents(year: y, month: m, day: d))!
+}
+
+
+final class StatusIconTests: XCTestCase {
+    /// Alpha of the rendered icon at `point` (in image points, origin bottom-left).
+    private func alpha(_ image: NSImage, at point: CGPoint) -> CGFloat {
+        let rep = NSBitmapImageRep(data: image.tiffRepresentation!)!
+        let sx = CGFloat(rep.pixelsWide) / image.size.width, sy = CGFloat(rep.pixelsHigh) / image.size.height
+        let x = Int(point.x * sx), y = rep.pixelsHigh - 1 - Int(point.y * sy)
+        return rep.colorAt(x: x, y: y)?.alphaComponent ?? 0
+    }
+
+    func testPlainIconHasNoBadge() {
+        let image = StatusIcon.image(badge: 0)
+        XCTAssertTrue(image.isTemplate, "must follow the menu bar's light/dark appearance")
+        XCTAssertEqual(alpha(image, at: StatusIcon.badgeCenter), 0, "bottom-right corner stays empty")
+    }
+
+    func testBadgedIconDrawsACircleBottomRight() {
+        let image = StatusIcon.image(badge: 1)
+        XCTAssertTrue(image.isTemplate)
+        XCTAssertEqual(image.size, StatusIcon.image(badge: 0).size, "badge must not shift the icon")
+        let c = StatusIcon.badgeCenter, r = StatusIcon.badgeRadius
+        XCTAssertGreaterThan(alpha(image, at: CGPoint(x: c.x - r * 0.7, y: c.y)), 0.9, "circle is filled")
+        XCTAssertGreaterThan(alpha(image, at: CGPoint(x: c.x, y: c.y + r * 0.75)), 0.9, "circle is filled")
+    }
+
+    func testBadgeTextCapsAtNinePlus() {
+        XCTAssertEqual(StatusIcon.badgeText(1), "1")
+        XCTAssertEqual(StatusIcon.badgeText(9), "9")
+        XCTAssertEqual(StatusIcon.badgeText(12), "9+")
+    }
 }

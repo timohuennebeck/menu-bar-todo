@@ -150,6 +150,10 @@ final class TaskStore {
         items.reduce(0) { $0 + (filter.matches($1, today: today) ? 1 : 0) }
     }
 
+    /// What the status-bar badge shows: tasks due today plus overdue ones (the two
+    /// filters are disjoint — a running range counts as today, not as overdue).
+    var badgeCount: Int { count(for: .overdue) + count(for: .today) }
+
     /// Sorted items that pass the active filter — what the list shows.
     var filteredItems: [TodoTask] {
         sortedItems.filter { filter.matches($0, today: today) }

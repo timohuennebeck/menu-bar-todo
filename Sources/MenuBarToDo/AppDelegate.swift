@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Owns the status-bar item and the floating panel that hosts the SwiftUI UI.
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var panel: PanelWindowController?
@@ -85,20 +86,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
-            if let image = NSImage(systemSymbolName: "list.clipboard.fill", accessibilityDescription: "To-Do") {
-                image.isTemplate = true
-                button.image = image
-            } else {
-                // Never leave an invisible status item — it is the app's only entry point.
-                button.title = "✓"
-                NSLog("MenuBarToDo: status icon symbol unavailable; falling back to a text title")
-            }
             button.toolTip = "Menu Bar To-Do"
             button.target = self
             button.action = #selector(statusItemClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         statusItem = item
+        observeBadge()
+    }
+
+    /// Keeps the icon's badge (today + overdue) in sync with the store. Observation
+    /// tracking fires once per change, so the tracking is re-armed after every update;
+    /// that also covers the midnight rollover, which changes `store.today`.
+    private func observeBadge() {
+        withObservationTracking {
+            statusItem?.button?.image = StatusIcon.image(badge: store.badgeCount)
+        } onChange: { [weak self] in
+            DispatchQueue.main.async { self?.observeBadge() }
+        }
     }
 
     @objc private func statusItemClicked(_ sender: Any?) {
@@ -144,7 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// at is left alone so the shortcut can't wipe a half-typed task, and an add draft
     /// survives a panel close for the same reason. An edit form behind a *closed* panel
     /// does not win: `route` outlives the panel, and the shortcut promises the add form.
-    static func opensAddForm(from route: Route, panelShown: Bool) -> Bool {
+    nonisolated static func opensAddForm(from route: Route, panelShown: Bool) -> Bool {
         switch route {
         case .add: return false
         case .edit: return !panelShown
