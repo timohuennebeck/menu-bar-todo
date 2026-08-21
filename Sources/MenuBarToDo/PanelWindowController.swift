@@ -137,6 +137,12 @@ final class PanelWindowController {
         window.alphaValue = 0
         window.orderFrontRegardless()
         window.makeKey()
+        // Coming on screen lays the content out for a route that changed while hidden
+        // (the add shortcut). SwiftUI reports that size *before* `isVisible` flips, so
+        // `resize` only remembered it. Push it through again now that the window is
+        // visible: a changed size is applied on the next turn (still at alpha ≈ 0),
+        // an unchanged one is a no-op.
+        if contentSize.height > 0 { resize(to: contentSize) }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.12
             window.animator().alphaValue = 1
@@ -173,6 +179,7 @@ final class PanelWindowController {
     func resize(to size: CGSize, display: Bool = true, animated: Bool = false,
                 duration: TimeInterval = TaskStore.collapseDuration) {
         guard size.width > 0, size.height > 0 else { return }
+        if PanelWindowController.logsSizes { NSLog("panel size report %.0f×%.0f (visible %d)", size.width, size.height, window.isVisible ? 1 : 0) }
         contentSize = size
         guard window.isVisible || !display else { return } // remember only; place it on show()
         let w = ceil(size.width), h = ceil(size.height)
@@ -214,6 +221,15 @@ final class PanelWindowController {
             // Placing before show: nothing is on screen yet, apply immediately.
             pendingFrame = nil
             window.setFrame(frame, display: display, animate: false)
+            // That setFrame runs a layout pass, and the first real layout for the current
+            // route can happen right there — SwiftUI then reports the true size
+            // *re-entrantly* (stored above, but not applied: the window isn't visible).
+            // Place again with it, or the panel shows up at the stale pre-layout height
+            // (a 153 pt window around the 313 pt add form).
+            if contentSize != size {
+                resize(to: contentSize, display: display)
+                return
+            }
             window.invalidateShadow()
         }
     }
