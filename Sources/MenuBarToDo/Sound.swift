@@ -1,8 +1,9 @@
 import AVFoundation
 import AppKit
 
-/// The "task done" chime: a short, bright two-note ding (G5 → D6) with a soft
-/// harmonic tail, synthesized once and replayed from memory. No asset needed.
+/// The "task done" sound: two wet "bloops" a fifth apart ("bu-dup"), each a sine
+/// whose pitch glides up as it decays, synthesized once and replayed from memory.
+/// No asset needed.
 final class CompletionSound {
     static let shared = CompletionSound()
 
@@ -53,8 +54,9 @@ final class CompletionSound {
         }
     }
 
-    /// Two partial-rich sine notes with a 6 ms attack and exponential decay,
-    /// the second note starting 90 ms after the first.
+    /// Two bloops 110 ms apart (180 → 720 Hz, then 270 → 1080 Hz): each a sine plus a
+    /// touch of second harmonic whose pitch glides up over ~30 ms while the level
+    /// decays, with a 4 ms attack. Normalized and soft-clipped to a fixed peak.
     private static func renderChime(format: AVAudioFormat) -> AVAudioPCMBuffer? {
         let sampleRate = format.sampleRate
         let duration = 0.42
@@ -63,23 +65,26 @@ final class CompletionSound {
               let channel = buffer.floatChannelData?[0] else { return nil }
         buffer.frameLength = frameCount
 
-        struct Note { let frequency: Double; let start: Double; let amplitude: Double }
-        let notes = [
-            Note(frequency: 783.99, start: 0.00, amplitude: 0.55),   // G5
-            Note(frequency: 1174.66, start: 0.09, amplitude: 0.50)   // D6
-        ]
+        struct Bloop { let baseFrequency: Double; let start: Double }
+        let bloops = [Bloop(baseFrequency: 180, start: 0.0), Bloop(baseFrequency: 270, start: 0.11)]
+        var phases = [Double](repeating: 0, count: bloops.count)
+        var samples = [Double](repeating: 0, count: Int(frameCount))
 
         for i in 0..<Int(frameCount) {
             let t = Double(i) / sampleRate
             var sample = 0.0
-            for note in notes where t >= note.start {
-                let lt = t - note.start
-                let envelope = min(lt / 0.006, 1) * exp(-lt * 7.5)
-                let phase = 2 * Double.pi * note.frequency * lt
-                let tone = sin(phase) + 0.35 * sin(2 * phase) + 0.12 * sin(3 * phase)
-                sample += note.amplitude * envelope * tone
+            for (k, bloop) in bloops.enumerated() where t >= bloop.start {
+                let lt = t - bloop.start
+                let frequency = bloop.baseFrequency + 3 * bloop.baseFrequency * (1 - exp(-lt / 0.03))
+                phases[k] += 2 * Double.pi * frequency / sampleRate
+                let envelope = min(lt / 0.004, 1) * exp(-lt * 13)
+                sample += envelope * (sin(phases[k]) + 0.25 * sin(2 * phases[k]))
             }
-            channel[i] = Float(max(-1, min(1, sample * 0.6)))
+            samples[i] = sample
+        }
+        let peak = samples.map(abs).max() ?? 1
+        for i in 0..<Int(frameCount) {
+            channel[i] = Float(tanh(samples[i] / peak * 0.9)) * 0.8
         }
         return buffer
     }

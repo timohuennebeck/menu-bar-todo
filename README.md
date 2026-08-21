@@ -14,9 +14,10 @@ animating content, coalesced to one frame update per display cycle so nothing ji
   The insertion line previews the exact slot (top half of a row → before it, bottom half → after it, group header → first, group end → last).
 - Filter menu above the list: Kein Filter / Überfällig / Heute (range tasks count as "Heute" while today is inside the range).
 - Web-like affordances: pointing-hand cursor on everything clickable, grab cursor on drag handles, clicking outside a text field unfocuses it.
-- Add / edit tasks with title, description, "Heute"/"Morgen" chips and a scrollable calendar with single-day or
-  range selection (current month + four ahead, widened so the current selection is always reachable).
-- Checking a task off plays a check animation + a synthesized two-note chime (`Sound.swift`, no asset); after 0.6 s the row
+- Add / edit tasks with title, description and a due-date chip that opens a scrollable calendar with single-day or
+  range selection (current month + four ahead, widened so the current selection is always reachable); clicking
+  anywhere outside the calendar collapses it.
+- Checking a task off plays a check animation + a synthesized two-note "bu-dup" bloop (`Sound.swift`, no asset); after 0.6 s the row
   fades out (0.2 s), then collapses to zero height (0.25 s, its group header too if it was the last row) and is removed only
   once invisible — no jump, no flicker. The collapse is an `Animatable` modifier so layout really interpolates and the panel
   window follows it frame by frame.
