@@ -47,6 +47,21 @@ struct DoneTask: Identifiable, Codable, Equatable {
 struct Snapshot: Codable {
     var items: [TodoTask]
     var done: [DoneTask]
+    /// Month groups the user folded up, as `TaskGroup.collapseKey`s.
+    var collapsedMonths: Set<String> = []
+
+    init(items: [TodoTask], done: [DoneTask], collapsedMonths: Set<String> = []) {
+        self.items = items
+        self.done = done
+        self.collapsedMonths = collapsedMonths
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        items = try c.decode([TodoTask].self, forKey: .items)
+        done = try c.decode([DoneTask].self, forKey: .done)
+        collapsedMonths = try c.decodeIfPresent(Set<String>.self, forKey: .collapsedMonths) ?? []
+    }
 }
 
 /// JSON file persistence in ~/Library/Application Support/MenuBarToDo/tasks.json.

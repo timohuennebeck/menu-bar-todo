@@ -9,8 +9,27 @@ final class LabelTests: XCTestCase {
         XCTAssertEqual(DueLabel.make(for: t.adding(1), style: .relative), DueLabel(text: "Morgen", tone: .neutral))
         let in3 = t.adding(3)
         XCTAssertEqual(DueLabel.make(for: in3, style: .relative).text, German.weekday(in3) + ".")
-        let in10 = t.adding(10)
-        XCTAssertEqual(DueLabel.make(for: in10, style: .relative).text, German.absolute(in10))
+    }
+
+    /// Beyond the coming week the list stops making one group per date: the header
+    /// names the month, the row's due line carries the exact day.
+    func testFarFutureGroupsByMonth() {
+        let t = Day(date(2026, 8, 21)) // Friday
+        func make(_ d: Day, style: DateFormatStyle = .relative) -> DueLabel {
+            DueLabel.make(for: d, style: style, today: t)
+        }
+        XCTAssertEqual(make(t.adding(6)).text, "Do.", "inside the week: still the weekday")
+        XCTAssertEqual(make(t.adding(7)), DueLabel(text: "Später im August", tone: .neutral),
+                       "rest of the current month")
+        XCTAssertEqual(make(Day(date(2026, 8, 31))).text, "Später im August")
+        XCTAssertEqual(make(Day(date(2026, 9, 1))).text, "September")
+        XCTAssertEqual(make(Day(date(2026, 12, 24))).text, "Dezember")
+        XCTAssertEqual(make(Day(date(2027, 1, 2))).text, "Januar 2027", "year only once it differs")
+        XCTAssertEqual(make(Day(date(2027, 8, 5))).text, "August 2027",
+                       "same month next year must not merge with this month's group")
+        XCTAssertEqual(make(t.adding(7), style: .absolute).text, "Später im August",
+                       "absolute mode changes wording for the week, not the month buckets")
+        XCTAssertEqual(make(t.adding(6), style: .absolute).text, "27. Aug")
     }
 
     func testAbsoluteLabelsKeepTone() {
@@ -94,6 +113,7 @@ final class LabelTests: XCTestCase {
         XCTAssertEqual(snapshot.items.first?.createdAt, .today)
         XCTAssertNil(snapshot.done.first?.createdAt)
         XCTAssertNil(snapshot.done.first?.completedAt)
+        XCTAssertEqual(snapshot.collapsedMonths, [])
     }
 
     func testMondayFirstLeadingBlanks() {
@@ -114,6 +134,78 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(labels[1], "Heute")
         XCTAssertEqual(labels[2], "Morgen")
         XCTAssertEqual(store.sortedItems.compactMap(\.due), store.sortedItems.compactMap(\.due).sorted())
+        let farthest = store.sortedItems.compactMap(\.due).max()!
+        XCTAssertGreaterThanOrEqual(farthest.days(since: store.today), 7, "the seed shows off a month bucket")
+        XCTAssertEqual(labels.last, German.monthGroup(farthest, today: store.today))
+    }
+
+    // MARK: Collapsible month groups
+
+    private func monthGroups(_ store: TaskStore) -> [TaskGroup] { store.groups.filter { $0.collapseKey != nil } }
+
+    func testOnlyMonthGroupsCarryACollapseKey() {
+        let store = makeStore()
+        let t = store.today
+        for group in store.groups {
+            guard let due = group.due else { XCTAssertNil(group.collapseKey); continue }
+            if due.days(since: t) >= 7 {
+                XCTAssertEqual(group.collapseKey, String(format: "%04d-%02d", due.year, due.month), group.label.text)
+            } else {
+                XCTAssertNil(group.collapseKey, group.label.text)
+            }
+        }
+        XCTAssertFalse(monthGroups(store).isEmpty, "the seed must contain a month group")
+    }
+
+    func testToggleCollapsedHidesNothingFromTheModel() {
+        let store = makeStore()
+        let group = monthGroups(store)[0]
+        XCTAssertFalse(store.isCollapsed(group))
+        store.toggleCollapsed(group)
+        XCTAssertTrue(store.isCollapsed(group))
+        XCTAssertEqual(store.groups.first { $0.id == group.id }?.rows.count, group.rows.count,
+                       "rows stay in the group; only the view hides them")
+        store.toggleCollapsed(group)
+        XCTAssertFalse(store.isCollapsed(group))
+    }
+
+    func testToggleCollapsedOnANonMonthGroupIsIgnored() {
+        let store = makeStore()
+        let heute = store.groups.first { $0.label.text == "Heute" }!
+        store.toggleCollapsed(heute)
+        XCTAssertFalse(store.isCollapsed(heute))
+    }
+
+    func testCollapsedStateSurvivesReload() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("collapse-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("tasks.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let persistence = Persistence(url: url)
+
+        let first = TaskStore(persistence: persistence)
+        let group = monthGroups(first)[0]
+        first.toggleCollapsed(group)
+
+        let second = TaskStore(persistence: persistence)
+        XCTAssertTrue(second.isCollapsed(monthGroups(second)[0]))
+    }
+
+    func testStaleCollapseKeysArePrunedOnSave() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("collapse-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("tasks.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let persistence = Persistence(url: url)
+        var seed = TaskStore.seed()
+        seed.collapsedMonths = ["1999-01"]
+        persistence.save(seed)
+
+        let store = TaskStore(persistence: persistence)
+        let group = monthGroups(store)[0]
+        store.toggleCollapsed(group) // any save
+        guard case .loaded(let saved) = persistence.load() else { return XCTFail("nothing saved") }
+        XCTAssertEqual(saved.collapsedMonths, [group.collapseKey!], "1999-01 has no group any more")
     }
 
     func testAddRequiresTitleAndReturnsToList() {
@@ -415,7 +507,7 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(visible(store), [["Steuerunterlagen einreichen"]])
 
         store.filter = .none
-        XCTAssertEqual(store.filteredItems.count, 5)
+        XCTAssertEqual(store.filteredItems.count, store.items.count)
         XCTAssertEqual(TaskFilter.allCases.map(\.rawValue), ["Kein Filter", "Überfällig", "Heute", "Datum vorhanden"])
     }
 

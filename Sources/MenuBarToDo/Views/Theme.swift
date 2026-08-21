@@ -11,7 +11,6 @@ enum Theme {
     static let muted = Color(nsColor: .secondaryLabelColor)                          // #86868B
     static let muted2 = Color(nsColor: .tertiaryLabelColor)                          // #A1A1A6
     static let line = Color.primary.opacity(0.22)                                    // #C7C7CC
-    static let divider = Color.primary.opacity(0.07)
     static let fieldBackground = Color.primary.opacity(0.05)
     static let chipBackground = Color.primary.opacity(0.055)
     static let hoverBackground = Color.primary.opacity(0.07)
@@ -35,8 +34,11 @@ enum Theme {
 // MARK: - Cursors (the design's `cursor: pointer` / `cursor: grab`)
 
 extension View {
-    /// Pointing-hand cursor while hovering, for anything clickable.
-    func pointerCursor() -> some View { modifier(CursorModifier(kind: .pointer)) }
+    /// Pointing-hand cursor while hovering, for anything clickable. `enabled: false`
+    /// leaves the arrow (for views that are only sometimes clickable).
+    func pointerCursor(enabled: Bool = true) -> some View {
+        modifier(CursorModifier(kind: .pointer, enabled: enabled))
+    }
     /// Open-hand cursor for drag handles.
     func grabCursor() -> some View { modifier(CursorModifier(kind: .grab)) }
 }
@@ -44,10 +46,13 @@ extension View {
 private struct CursorModifier: ViewModifier {
     enum Kind { case pointer, grab }
     let kind: Kind
+    var enabled = true
     @State private var hovering = false
 
     func body(content: Content) -> some View {
-        if #available(macOS 15, *) {
+        if !enabled {
+            content
+        } else if #available(macOS 15, *) {
             content.pointerStyle(kind == .pointer ? .link : .grabIdle)
         } else {
             // macOS 14 fallback: set the cursor by hand and restore it when the

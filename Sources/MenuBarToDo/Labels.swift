@@ -16,9 +16,7 @@ enum German {
     static func monthShort(_ d: Day) -> String { monthsShort[d.month - 1] }
 
     /// "20. Aug"; the year is appended once it differs from the current one
-    /// ("20. Aug 2027"). Besides being clearer, this keeps two days a year apart
-    /// from sharing a due label — the label text is the list's grouping key, and
-    /// a merged group would silently re-date tasks dragged inside it.
+    /// ("20. Aug 2027").
     static func absolute(_ d: Day, today: Day = .today) -> String {
         let base = "\(d.dayOfMonth). \(monthShort(d))"
         return d.year == today.year ? base : "\(base) \(d.year)"
@@ -63,6 +61,15 @@ enum German {
         return "\(from) – \(weekday(end)), \(absolute(end, today: today))"
     }
 
+    /// Group header for a day beyond the coming week: "Später im August" for the rest
+    /// of the current month, then "September", and "Januar 2027" once the year differs
+    /// (so August of next year never merges with this August's group).
+    static func monthGroup(_ d: Day, today: Day = .today) -> String {
+        let month = monthsLong[d.month - 1]
+        if d.year != today.year { return "\(month) \(d.year)" }
+        return d.month == today.month ? "Später im \(month)" : month
+    }
+
     /// "Mi, 20. Aug 2026"
     static func long(_ d: Day) -> String {
         "\(weekday(d)), \(d.dayOfMonth). \(monthShort(d)) \(d.year)"
@@ -87,17 +94,33 @@ struct DueLabel: Equatable {
     static let undated = DueLabel(text: "Kein Datum", tone: .neutral)
 
     /// Mirrors the design: overdue → "Überfällig" (red), today → "Heute" (blue),
-    /// tomorrow → "Morgen", within a week → weekday ("Fr."), else absolute date.
-    /// In absolute mode everything is "20. Aug", only the colors remain.
+    /// tomorrow → "Morgen", within a week → weekday ("Fr."). Anything further out is
+    /// bucketed by month ("Später im August", "September", "Januar 2027") — one group
+    /// per date would bury a long horizon under headers that just repeat the row's
+    /// due line. In absolute mode the week reads "20. Aug", only the colors remain;
+    /// the month buckets are the same.
     static func make(for day: Day, style: DateFormatStyle, today: Day = .today) -> DueLabel {
         let dd = day.days(since: today)
         let abs = style == .absolute
         let absText = German.absolute(day, today: today)
         if dd < 0 { return DueLabel(text: abs ? absText : "Überfällig", tone: .overdue) }
         if dd == 0 { return DueLabel(text: abs ? absText : "Heute", tone: .today) }
-        if dd == 1, !abs { return DueLabel(text: "Morgen", tone: .neutral) }
-        if dd < 7, !abs { return DueLabel(text: German.weekday(day) + ".", tone: .neutral) }
-        return DueLabel(text: absText, tone: .neutral)
+        if monthKey(for: day, today: today) != nil {
+            return DueLabel(text: German.monthGroup(day, today: today), tone: .neutral)
+        }
+        if abs { return DueLabel(text: absText, tone: .neutral) }
+        if dd == 1 { return DueLabel(text: "Morgen", tone: .neutral) }
+        return DueLabel(text: German.weekday(day) + ".", tone: .neutral)
+    }
+
+    /// Days this far out (and further) are grouped by month instead of by day.
+    static let monthHorizon = 7
+
+    /// "2026-09" when `day` falls into a month bucket, nil while it still gets its
+    /// own near-term group. This is the identity a collapsed group is remembered by.
+    static func monthKey(for day: Day, today: Day = .today) -> String? {
+        guard day.days(since: today) >= monthHorizon else { return nil }
+        return String(format: "%04d-%02d", day.year, day.month)
     }
 
     /// The due line under a list row, Todoist-style: "Gestern" / "Heute" / "Morgen", the

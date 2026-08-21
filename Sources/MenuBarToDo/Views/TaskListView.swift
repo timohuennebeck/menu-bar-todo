@@ -42,7 +42,11 @@ private struct GroupView: View {
 
     private var zone: DropZoneStyle { store.settings.dropZoneStyle }
     private var active: Bool { store.isGroupActive(group) }
-    private var showsEndIndicator: Bool { store.showsGroupIndicator(group) }
+    /// A collapsed group has no visible rows, so any hover over it is "the end".
+    private var showsEndIndicator: Bool { store.showsGroupIndicator(group) || (collapsed && active) }
+    /// Month buckets fold up on a header click; near-term groups don't.
+    private var collapsible: Bool { group.collapseKey != nil }
+    private var collapsed: Bool { store.isCollapsed(group) }
     /// Every row is fading/collapsing → the header goes with them so the group leaves as one.
     private var fading: Bool { group.rows.allSatisfy { store.isFading($0.id) } }
     private var collapsing: Bool { group.rows.allSatisfy { store.isCollapsing($0.id) } }
@@ -50,22 +54,29 @@ private struct GroupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header (incl. the group's top padding) collapses together with its last row.
-            HStack(spacing: 8) {
-                SectionLabel(text: group.label.text, color: labelColor)
-                Rectangle()
-                    .fill(dividerColor)
-                    .frame(height: zone == .header && active ? 1.5 : 1)
-                    .clipShape(Capsule())
+            // Label only, no divider line — but full width, so the whole strip is the
+            // click target of a month group and the "Kopfzeile" drop zone.
+            SectionLabel(text: collapsed ? "\(group.label.text) (\(group.rows.count))" : group.label.text,
+                         color: labelColor)
+                .fixedSize()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(EdgeInsets(top: 8, leading: 14, bottom: 4, trailing: 14))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard collapsible else { return }
+                withAnimation(.easeOut(duration: 0.2)) { store.toggleCollapsed(group) }
             }
-            .padding(EdgeInsets(top: 8, leading: 14, bottom: 4, trailing: 14))
+            .pointerCursor(enabled: collapsible) // the only hint that a month header is clickable
             .opacity(fading ? 0 : 1)
             .animation(.easeOut(duration: TaskStore.fadeDuration), value: fading)
             .fixedSize(horizontal: false, vertical: true)
             .measureHeight($headerHeight)
             .collapsible(collapsing, naturalHeight: headerHeight)
 
-            ForEach(Array(group.rows.enumerated()), id: \.element.id) { index, task in
-                RowView(task: task, index: index, group: group)
+            if !collapsed {
+                ForEach(Array(group.rows.enumerated()), id: \.element.id) { index, task in
+                    RowView(task: task, index: index, group: group)
+                }
             }
 
             // Group's bottom padding, collapsible as well so nothing is left to jump.
@@ -110,10 +121,6 @@ private struct GroupView: View {
 
     private var labelColor: Color {
         zone == .header && active ? Theme.blue : Theme.tone(group.label.tone)
-    }
-
-    private var dividerColor: Color {
-        zone == .header && active ? Theme.blue : Theme.divider
     }
 }
 

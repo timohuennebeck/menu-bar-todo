@@ -10,7 +10,8 @@ row slid out. `PanelWindowController` sets the window frame directly (top-anchor
 animating content, coalesced to one frame update per display cycle so nothing jitters.
 
 - Lives only in the menu bar (no Dock icon, no windows). Click the clipboard icon to open the panel; click anywhere else to dismiss.
-- Open tasks grouped by due date (Überfällig / Heute / Morgen / weekday / date), drag & drop between groups or rows.
+- Open tasks grouped by due date (Überfällig / Heute / Morgen / weekday, then by month: "Später im August", "September", "Januar 2027"), drag & drop between groups or rows.
+  Month groups fold up on a header click ("September (3)"); the collapsed set is saved with the tasks.
   Range tasks sit under "Heute" while the range is running.
   The insertion line previews the exact slot (top half of a row → before it, bottom half → after it, group header → first, group end → last).
 - Filter menu above the list: Kein Filter / Überfällig / Heute / Datum vorhanden (range tasks count as "Heute" while

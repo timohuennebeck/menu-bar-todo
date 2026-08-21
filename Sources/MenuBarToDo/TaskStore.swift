@@ -36,6 +36,10 @@ struct TaskGroup: Identifiable {
     /// "Kein Datum" group.
     let due: Day?
     let rows: [TodoTask]
+    /// "2026-09" for a month bucket (the user can collapse those; the key is what
+    /// gets persisted, so "Später im August" doesn't re-collapse next August). nil
+    /// for the near-term and undated groups, which always stay open.
+    var collapseKey: String? = nil
     var id: String { label.text }
 }
 
@@ -64,6 +68,8 @@ final class TaskStore {
     var route: Route = .list
     var draft = Draft()
     var filter: TaskFilter = .none
+    /// Month groups the user folded up (`TaskGroup.collapseKey`s). Persisted.
+    private(set) var collapsedMonths: Set<String> = []
 
     /// The current calendar day as *observable* state. Date-derived UI (groups,
     /// due labels, filters) reads this instead of Day.today so it re-derives when
@@ -84,6 +90,7 @@ final class TaskStore {
         case .loaded(let saved):
             items = saved.items
             done = saved.done
+            collapsedMonths = saved.collapsedMonths
         case .failed:
             // The unreadable file was moved aside by load(). Start empty instead of
             // masking the failure with demo data, and write nothing until the user
@@ -161,8 +168,31 @@ final class TaskStore {
             buckets[label.text]?.rows.append(item)
         }
         return order.compactMap { key in
-            buckets[key].map { TaskGroup(label: $0.label, due: $0.due, rows: $0.rows) }
+            buckets[key].map {
+                TaskGroup(label: $0.label, due: $0.due, rows: $0.rows,
+                          collapseKey: $0.due.flatMap { DueLabel.monthKey(for: $0, today: today) })
+            }
         }
+    }
+
+    // MARK: - Collapsible month groups
+
+    func isCollapsed(_ group: TaskGroup) -> Bool {
+        group.collapseKey.map(collapsedMonths.contains) ?? false
+    }
+
+    /// Folds a month group up / open. Near-term groups have no key and ignore this.
+    func toggleCollapsed(_ group: TaskGroup) {
+        guard let key = group.collapseKey else { return }
+        if collapsedMonths.remove(key) == nil { collapsedMonths.insert(key) }
+        persist()
+    }
+
+    /// Keys that still name a month with open tasks — the rest is forgotten on save,
+    /// so the file doesn't accumulate months that came and went. Checked against all
+    /// items, not the filtered list: a filter must not wipe the state of hidden groups.
+    private var liveCollapseKeys: Set<String> {
+        Set(items.compactMap { anchorDay($0) }.compactMap { DueLabel.monthKey(for: $0, today: today) })
     }
 
     var editingTask: TodoTask? {
@@ -480,7 +510,8 @@ final class TaskStore {
     // MARK: - Persistence / seed
 
     private func persist() {
-        persistence?.save(Snapshot(items: items, done: done))
+        collapsedMonths.formIntersection(liveCollapseKeys)
+        persistence?.save(Snapshot(items: items, done: done, collapsedMonths: collapsedMonths))
     }
 
     static func seed() -> Snapshot {
@@ -491,7 +522,9 @@ final class TaskStore {
                 TodoTask(title: "Design-Review vorbereiten", details: "Feedback aus Figma einarbeiten", due: t, createdAt: t.adding(-2)),
                 TodoTask(title: "Zahnarzttermin bestätigen", due: t.adding(1), createdAt: t.adding(-1)),
                 TodoTask(title: "Wochenbericht schreiben", details: "Zahlen aus dem Dashboard exportieren", due: t.adding(2), createdAt: t),
-                TodoTask(title: "Geschenk für Lena besorgen", due: t.adding(6), createdAt: t)
+                TodoTask(title: "Geschenk für Lena besorgen", due: t.adding(6), createdAt: t),
+                TodoTask(title: "Versicherung kündigen", due: t.adding(9), createdAt: t),
+                TodoTask(title: "Reisepass verlängern", details: "Termin beim Bürgeramt buchen", due: t.adding(12), createdAt: t)
             ],
             done: [
                 DoneTask(id: UUID(), title: "Miete überweisen", createdAt: t.adding(-6), completedAt: t.adding(-1)),
