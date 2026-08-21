@@ -71,9 +71,14 @@ final class PanelWindowController {
         effect.material = .popover
         effect.blendingMode = .behindWindow
         effect.state = .active
+        // The blur region is the *mask image*, not the layer's corner radius: with only
+        // `layer.cornerRadius` the material is clipped but the behind-window blur still
+        // covers the full rectangle, leaving a lighter square outside every rounded corner.
+        // The mask's corners are circular, so the layer uses the default curve too — a
+        // `.continuous` layer corner inside a circular mask would show the same artifact.
+        effect.maskImage = PanelWindowController.roundedMask
         effect.wantsLayer = true
-        effect.layer?.cornerRadius = PanelWindowController.cornerRadius
-        effect.layer?.cornerCurve = .continuous
+        effect.layer?.cornerRadius = PanelWindowController.cornerRadius // clips the SwiftUI content
         effect.layer?.masksToBounds = true
 
         host.view.translatesAutoresizingMaskIntoConstraints = false
@@ -86,6 +91,23 @@ final class PanelWindowController {
         ])
         window.contentView = effect
     }
+    // MARK: - Shape
+
+    /// Resizable rounded-rect mask for the effect view: the corners stay fixed and the
+    /// edges stretch, so one image fits the panel at every height.
+    private static let roundedMask: NSImage = {
+        let radius = PanelWindowController.cornerRadius
+        let side = radius * 2 + 1
+        let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
+    }()
+
 
     // MARK: - Show / hide
 
@@ -136,10 +158,6 @@ final class PanelWindowController {
             self.window.alphaValue = 1
         })
         onClose?()
-    }
-
-    func toggle(below anchor: NSRect) {
-        if isShown { close() } else { show(below: anchor) }
     }
 
     // MARK: - Sizing

@@ -11,6 +11,10 @@ enum Route: Equatable {
         if case .edit = self { return true }
         return false
     }
+
+    /// True while the add/edit form owns the panel — a state Esc must not clobber,
+    /// since it can hold half-typed input.
+    var isForm: Bool { self == .add || isEdit }
 }
 
 /// The add/edit form's working copy.

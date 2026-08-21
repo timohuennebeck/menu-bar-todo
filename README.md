@@ -9,7 +9,7 @@ row slid out. `PanelWindowController` sets the window frame directly (top-anchor
 12 pt radius, shadow, no arrow — matching the design); while a row collapses it follows the
 animating content, coalesced to one frame update per display cycle so nothing jitters.
 
-- Lives only in the menu bar (no Dock icon, no windows). Click the list icon to open the panel; click anywhere else to dismiss.
+- Lives only in the menu bar (no Dock icon, no windows). Click the clipboard icon to open the panel; click anywhere else to dismiss.
 - Open tasks grouped by due date (Überfällig / Heute / Morgen / weekday / date), drag & drop between groups or rows.
   The insertion line previews the exact slot (top half of a row → before it, bottom half → after it, group header → first, group end → last).
 - Filter menu above the list: Kein Filter / Überfällig / Heute (range tasks count as "Heute" while today is inside the range).
@@ -24,7 +24,13 @@ animating content, coalesced to one frame update per display cycle so nothing ji
 - Tasks without a description show "Erstellt am …"; the "Erledigt" list shows "Erledigt am …" and restores with one tap.
 - Tasks persist as JSON in `~/Library/Application Support/MenuBarToDo/tasks.json` (seeded with the design's sample
   data on first launch). A file that fails to load is moved aside as `tasks.corrupt-<timestamp>.json` — never overwritten.
-- Right-click (or Control-click) the status item → *Menu Bar To-Do beenden* to quit.
+- Global keyboard shortcuts (work from any app, no Accessibility permission needed): **⇧⌘O** shows/hides the panel,
+  **⇧⌘L** opens it straight into *Task hinzufügen* (a form you are looking at is left alone). Registered via Carbon
+  `RegisterEventHotKey` in `HotKey.swift`. Caveat: a global hotkey shadows the same shortcut in whichever app is
+  frontmost (⇧⌘O/⇧⌘L are Xcode's *Open Quickly*/*Library*); only a clash with another Carbon hotkey is detected, and
+  that shortcut is then skipped with a log line.
+- Right-click (or Control-click) the status item → *Ein-/Ausblenden*, *Task hinzufügen* (with their shortcuts) and
+  *Menu Bar To-Do beenden* to quit.
 
 Requires macOS 14+ and Xcode 15+ (built with Xcode 26.5 / Swift 6.3).
 
@@ -55,6 +61,7 @@ Sources/MenuBarToDo/
   Sound.swift                      synthesized completion chime (AVAudioEngine)
   TaskStore.swift                  @Observable store: tasks, routing, draft, drag state
   Views/Theme.swift                design tokens + shared controls (chips, buttons, insertion line)
+  HotKey.swift                     global shortcuts (KeyCombo + Carbon RegisterEventHotKey wrapper)
   Views/PanelView.swift            root switch (list / add / edit / done) + footer + empty state
   Views/TaskListView.swift         grouped list, drag & drop delegates, drop-zone styles
   Views/TaskFormView.swift         add / edit form

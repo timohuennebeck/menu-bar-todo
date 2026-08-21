@@ -5,6 +5,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var panel: PanelWindowController?
+    private lazy var hotKeys = GlobalHotKeys()
     /// Preview/debug runs never touch the real tasks.json: routes like "empty" and
     /// "complete-anim" mutate the store destructively, and the next persist() would
     /// write that over the user's data.
@@ -22,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         configureStatusItem()
         configurePanel()
+        configureHotKeys()
         _ = CompletionSound.shared // render the chime up front so the first check-off isn't late
 
         // Debug aids:
@@ -83,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
-            if let image = NSImage(systemSymbolName: "list.bullet", accessibilityDescription: "To-Do") {
+            if let image = NSImage(systemSymbolName: "list.clipboard.fill", accessibilityDescription: "To-Do") {
                 image.isTemplate = true
                 button.image = image
             } else {
@@ -107,6 +109,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showContextMenu()
             return
         }
+        togglePanel()
+    }
+
+    // MARK: - Keyboard shortcuts
+
+    /// The combinations are defined on KeyCombo and work system-wide. One the system
+    /// refuses (held by another Carbon hotkey) is logged and skipped — never fatal.
+    /// Preview runs stay out of it: a snapshot taken while the real app runs would
+    /// otherwise steal (or fail to get) its shortcuts.
+    private func configureHotKeys() {
+        guard !Self.isPreviewRun else { return }
+        hotKeys.register(.togglePanel) { [weak self] in self?.togglePanel() }
+        hotKeys.register(.addTask) { [weak self] in self?.openAddTask() }
+    }
+
+    private func togglePanel() {
         if panel?.isShown == true {
             panel?.close()
         } else {
@@ -114,16 +132,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Opens the panel (if needed) in the add form.
+    private func openAddTask() {
+        let wasShown = panel?.isShown == true
+        // Route first, so the panel's first frame is sized for the form, not the list.
+        if Self.opensAddForm(from: store.route, panelShown: wasShown) { store.openAdd() }
+        if !wasShown { showPanel() }
+    }
+
+    /// Whether the add shortcut switches to the add form. A form the user is looking
+    /// at is left alone so the shortcut can't wipe a half-typed task, and an add draft
+    /// survives a panel close for the same reason. An edit form behind a *closed* panel
+    /// does not win: `route` outlives the panel, and the shortcut promises the add form.
+    static func opensAddForm(from route: Route, panelShown: Bool) -> Bool {
+        switch route {
+        case .add: return false
+        case .edit: return !panelShown
+        case .list, .done: return true
+        }
+    }
+
     /// Right-click on the status item: the only place to quit an accessory app.
     private func showContextMenu() {
         guard let item = statusItem else { return }
         let menu = NSMenu()
+        // Twins of the global hotkeys, with the combination spelled out for discoverability.
+        // (Uppercase key + .shift in the mask is what AppKit needs for ⇧⌘O; a lowercase
+        // key would bind plain ⌘O regardless of the mask.)
+        func addShortcut(_ title: String, combo: KeyCombo, action: Selector) {
+            let item = menu.addItem(withTitle: title, action: action, keyEquivalent: combo.key)
+            item.keyEquivalentModifierMask = combo.modifiers
+            item.target = self
+        }
+        addShortcut("Ein-/Ausblenden", combo: .togglePanel, action: #selector(menuTogglePanel))
+        addShortcut("Task hinzufügen", combo: .addTask, action: #selector(menuAddTask))
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Menu Bar To-Do beenden",
                      action: #selector(NSApplication.terminate(_:)),
                      keyEquivalent: "q")
         item.menu = menu
         item.button?.performClick(nil)
         item.menu = nil // detach again so left-click keeps toggling the panel
+    }
+
+    // Both menu actions defer to the next run-loop turn: the menu closes first, and
+    // opening the panel on the same turn would have it hang off a status item that is
+    // still in its highlighted state.
+    @objc private func menuTogglePanel() {
+        DispatchQueue.main.async { [weak self] in self?.togglePanel() }
+    }
+
+    @objc private func menuAddTask() {
+        DispatchQueue.main.async { [weak self] in self?.openAddTask() }
     }
 
     // MARK: - Panel
@@ -144,10 +204,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Esc inside a form cancels the form (SwiftUI's onExitCommand); elsewhere it closes the panel.
         panel.shouldCloseOnEscape = { [weak self] in
             guard let self else { return true }
-            switch self.store.route {
-            case .add, .edit: return false
-            default: return true
-            }
+            return !self.store.route.isForm
         }
         self.panel = panel
     }
