@@ -28,8 +28,8 @@ final class PanelResizeTests: XCTestCase {
     /// The design's 410 is the default, not the floor: the list can be dragged shorter.
     func testListCanBeShorterThanTheDesignDefault() {
         let defaults = makeDefaults()
-        PanelSettings(defaults: defaults).listMaxHeight = 250
-        XCTAssertEqual(PanelSettings(defaults: defaults).listMaxHeight, 250)
+        PanelSettings(defaults: defaults).listMaxHeight = 300
+        XCTAssertEqual(PanelSettings(defaults: defaults).listMaxHeight, 300)
     }
 
     /// The drag can never make the list shorter than the minimum, nor taller than the

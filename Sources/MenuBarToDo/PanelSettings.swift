@@ -11,9 +11,9 @@ final class PanelSettings {
     private static let widthKey = "panelWidth"
     /// Wider than this a to-do list only gets long lines; also keeps the scene sane.
     static let maxWidth: CGFloat = 600
-    /// About three rows: shorter and the list is a peephole. The design's 410 is the
+    /// About three rows with details: shorter and the list is a peephole. The design's 410 is the
     /// default, not the floor, so the panel can also be made *shorter* than it ships.
-    static let minListHeight: CGFloat = 200
+    static let minListHeight: CGFloat = 290
 
     /// While pinned the panel stays open when focus moves elsewhere; only the
     /// status item, ⌃⌘T and Esc still close it (see PanelWindowController.dismisses).
