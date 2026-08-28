@@ -621,8 +621,12 @@ struct ResizeGripArea: NSViewRepresentable {
             switch self {
             case .bottom: return .resizeUpDown
             case .left: return .resizeLeftRight
-            // No public diagonal cursor; the corner is small and the edges say enough.
-            case .bottomLeft: return .crosshair
+            case .bottomLeft:
+                // The system's diagonal window-resize cursor is public from macOS 15.
+                if #available(macOS 15, *) {
+                    return .frameResize(position: .bottomLeft, directions: .all)
+                }
+                return .crosshair
             }
         }
     }

@@ -13,6 +13,7 @@ struct TaskListView: View {
     @Environment(TaskStore.self) private var store
     @Environment(PanelSettings.self) private var settings
     @State private var frames = FrameRegistry()
+    @State private var contentHeight: CGFloat = 0
 
     var body: some View {
         ScrollView {
@@ -27,7 +28,9 @@ struct TaskListView: View {
             .onPreferenceChange(GroupFramesKey.self) { frames.groups = $0 }
             .onPreferenceChange(RowFramesKey.self) { frames.rows = $0 }
             .onDrop(of: [UTType.plainText], delegate: ListDropDelegate(store: store, frames: frames))
+            .scrollFadeContent(height: $contentHeight)
         }
+        .scrollFade(contentHeight: contentHeight)
         // No scroll indicator: with "always show scroll bars" it pops in/out while a row
         // collapses and steals width from the rows. The list still scrolls (wheel/trackpad).
         .scrollIndicators(.never)

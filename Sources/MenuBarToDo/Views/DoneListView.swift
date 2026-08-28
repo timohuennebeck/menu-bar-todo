@@ -4,6 +4,7 @@ import SwiftUI
 struct DoneListView: View {
     @Environment(TaskStore.self) private var store
     @Environment(PanelSettings.self) private var settings
+    @State private var contentHeight: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,7 +31,9 @@ struct DoneListView: View {
                             .padding(.vertical, 16)
                     }
                 }
+                .scrollFadeContent(height: $contentHeight)
             }
+            .scrollFade(contentHeight: contentHeight)
             .scrollIndicators(.never)
             .frame(maxHeight: settings.listMaxHeight)
         }

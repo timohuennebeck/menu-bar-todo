@@ -18,25 +18,31 @@ final class PanelResizeTests: XCTestCase {
         XCTAssertEqual(PanelSettings(defaults: defaults).listMaxHeight, 600)
     }
 
-    /// A stored value below the design cap (older build, hand-edited defaults) must not
-    /// shrink the panel below what it has always been.
-    func testStoredValueBelowTheCapIsIgnored() {
+    /// A stored value below the minimum (hand-edited defaults) is lifted to it.
+    func testStoredValueBelowTheMinimumIsLifted() {
         let defaults = makeDefaults()
         defaults.set(100, forKey: "panelListMaxHeight")
-        XCTAssertEqual(PanelSettings(defaults: defaults).listMaxHeight, Theme.listMaxHeight)
+        XCTAssertEqual(PanelSettings(defaults: defaults).listMaxHeight, PanelSettings.minListHeight)
     }
 
-    /// The drag can never make the list shorter than the design cap, nor taller than the
+    /// The design's 410 is the default, not the floor: the list can be dragged shorter.
+    func testListCanBeShorterThanTheDesignDefault() {
+        let defaults = makeDefaults()
+        PanelSettings(defaults: defaults).listMaxHeight = 250
+        XCTAssertEqual(PanelSettings(defaults: defaults).listMaxHeight, 250)
+    }
+
+    /// The drag can never make the list shorter than the minimum, nor taller than the
     /// room left on screen; in between it passes through unchanged.
-    func testClampKeepsTheListBetweenTheCapAndTheScreen() {
-        XCTAssertEqual(PanelSettings.clampListHeight(100, available: 800), Theme.listMaxHeight)
+    func testClampKeepsTheListBetweenTheMinimumAndTheScreen() {
+        XCTAssertEqual(PanelSettings.clampListHeight(100, available: 800), PanelSettings.minListHeight)
         XCTAssertEqual(PanelSettings.clampListHeight(600, available: 800), 600)
         XCTAssertEqual(PanelSettings.clampListHeight(900, available: 800), 800)
     }
 
     /// A tiny screen (or a panel dragged near the bottom) never inverts the clamp.
-    func testClampNeverGoesBelowTheCapEvenWhenThereIsNoRoom() {
-        XCTAssertEqual(PanelSettings.clampListHeight(600, available: 200), Theme.listMaxHeight)
+    func testClampNeverGoesBelowTheMinimumEvenWhenThereIsNoRoom() {
+        XCTAssertEqual(PanelSettings.clampListHeight(600, available: 100), PanelSettings.minListHeight)
     }
 
     /// Same reason as the drag grip: the first click into the inactive app must start

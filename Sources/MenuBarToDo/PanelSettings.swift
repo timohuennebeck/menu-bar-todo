@@ -11,6 +11,9 @@ final class PanelSettings {
     private static let widthKey = "panelWidth"
     /// Wider than this a to-do list only gets long lines; also keeps the scene sane.
     static let maxWidth: CGFloat = 600
+    /// About three rows: shorter and the list is a peephole. The design's 410 is the
+    /// default, not the floor, so the panel can also be made *shorter* than it ships.
+    static let minListHeight: CGFloat = 200
 
     /// While pinned the panel stays open when focus moves elsewhere; only the
     /// status item, ⌃⌘T and Esc still close it (see PanelWindowController.dismisses).
@@ -21,7 +24,7 @@ final class PanelSettings {
     /// How tall the task/done list may grow before it scrolls. The panel's height
     /// follows its content, so this cap — not a window height — is what the resize
     /// grip at the bottom edge drags (see ResizeGripArea): short lists stay short,
-    /// long ones get the extra rows. Never below the design's cap.
+    /// long ones get the extra rows. Between `minListHeight` and the screen.
     var listMaxHeight: CGFloat {
         didSet { defaults.set(Double(listMaxHeight), forKey: PanelSettings.listHeightKey) }
     }
@@ -38,11 +41,11 @@ final class PanelSettings {
         max(Theme.panelWidth, min(width, maxWidth, available))
     }
 
-    /// Clamps a dragged list height between the design cap and the room left on
+    /// Clamps a dragged list height between `minListHeight` and the room left on
     /// screen. `available` is the most the list may take; if even that is less than
-    /// the cap (tiny screen, panel dragged near the bottom), the cap wins.
+    /// the minimum (tiny screen, panel dragged near the bottom), the minimum wins.
     static func clampListHeight(_ height: CGFloat, available: CGFloat) -> CGFloat {
-        max(Theme.listMaxHeight, min(height, available))
+        max(minListHeight, min(height, available))
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -50,8 +53,8 @@ final class PanelSettings {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         isPinned = defaults.bool(forKey: PanelSettings.pinnedKey)
-        let stored = defaults.object(forKey: PanelSettings.listHeightKey) as? Double ?? 0
-        listMaxHeight = max(Theme.listMaxHeight, CGFloat(stored))
+        let stored = defaults.object(forKey: PanelSettings.listHeightKey) as? Double
+        listMaxHeight = stored.map { max(PanelSettings.minListHeight, CGFloat($0)) } ?? Theme.listMaxHeight
         let storedWidth = defaults.object(forKey: PanelSettings.widthKey) as? Double ?? 0
         panelWidth = max(Theme.panelWidth, CGFloat(storedWidth))
     }
