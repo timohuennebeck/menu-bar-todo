@@ -15,7 +15,7 @@ struct TaskFormView: View {
 
         VStack(spacing: 0) {
             HStack {
-                Text(mode == .add ? "Aufgabe hinzufügen" : "Aufgabe bearbeiten")
+                Text(mode == .add ? "Todo hinzufügen" : "Todo bearbeiten")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
@@ -91,7 +91,7 @@ struct TaskFormView: View {
                         .help("Das Formular bleibt offen, das Fälligkeitsdatum bleibt stehen")
                 }
 
-                PrimaryButton(title: mode == .add ? "Aufgabe hinzufügen" : "Speichern",
+                PrimaryButton(title: mode == .add ? "Todo hinzufügen" : "Speichern",
                               enabled: store.draft.isReady) {
                     store.submitDraft()
                     // The form stays open in this mode, so put the caret back where the

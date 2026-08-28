@@ -161,7 +161,7 @@ struct IconButton: View {
     }
 }
 
-/// Text-only footer link ("+ Aufgabe hinzufügen", "Erledigt (2)").
+/// Text-only footer link ("+ Todo hinzufügen", "Erledigt (2)").
 struct LinkButton: View {
     enum Kind { case accent, danger, muted }
 

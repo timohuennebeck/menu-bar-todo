@@ -102,7 +102,7 @@ struct PanelView: View {
         // so it takes the click instead of starting a drag.
         .overlay(alignment: .topLeading) {
             if PanelView.showsAddButton(for: store.route) {
-                IconButton(systemImage: "plus", help: "Aufgabe hinzufügen", onScene: true) {
+                IconButton(systemImage: "plus", help: "Todo hinzufügen", onScene: true) {
                     store.openAdd()
                 }
                 .padding(8)
@@ -255,8 +255,8 @@ struct FilteredEmptyView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Text(store.items.count == 1
-                     ? "1 offene Aufgabe ist ausgeblendet."
-                     : "\(store.items.count) offene Aufgaben sind ausgeblendet.")
+                     ? "1 offenes Todo ist ausgeblendet."
+                     : "\(store.items.count) offene Todos sind ausgeblendet.")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.muted)
             }
@@ -279,11 +279,11 @@ struct EmptyStateView: View {
                 Text("Inbox 0, To-Do-Edition")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
-                Text("Keine offenen Aufgaben.")
+                Text("Keine offenen Todos.")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.muted)
             }
-            Chip(title: "Aufgabe hinzufügen", style: .accent) { store.openAdd() }
+            Chip(title: "Todo hinzufügen", style: .accent) { store.openAdd() }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)

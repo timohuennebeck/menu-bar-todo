@@ -18,7 +18,7 @@ struct DoneListView: View {
             .padding(EdgeInsets(top: 5, leading: 14, bottom: 2, trailing: 14))
 
             // The list is a recent history, not an archive — say so where it's read.
-            Text("Erledigte Aufgaben werden nach \(TaskStore.doneRetentionDays) Tagen automatisch gelöscht.")
+            Text("Erledigte Todos werden nach \(TaskStore.doneRetentionDays) Tagen automatisch gelöscht.")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.muted2)
                 .frame(maxWidth: .infinity, alignment: .leading)

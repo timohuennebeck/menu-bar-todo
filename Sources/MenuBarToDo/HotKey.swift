@@ -13,7 +13,7 @@ struct KeyCombo: Equatable {
 
     /// ⌃⌘T — show/hide the panel.
     static let togglePanel = KeyCombo(keyCode: UInt32(kVK_ANSI_T), modifiers: [.control, .command], key: "T")
-    /// ⌃⌘N — open the panel straight into "Aufgabe hinzufügen".
+    /// ⌃⌘N — open the panel straight into "Todo hinzufügen".
     static let addTask = KeyCombo(keyCode: UInt32(kVK_ANSI_N), modifiers: [.control, .command], key: "N")
 
     /// The modifier mask in Carbon's vocabulary (only the four keys it knows).
