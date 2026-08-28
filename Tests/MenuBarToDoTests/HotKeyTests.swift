@@ -6,10 +6,10 @@ import XCTest
 final class HotKeyTests: XCTestCase {
     func testDefaultCombos() {
         XCTAssertEqual(KeyCombo.togglePanel.keyCode, UInt32(kVK_ANSI_T))
-        XCTAssertEqual(KeyCombo.togglePanel.modifiers, [.control, .option, .command])
+        XCTAssertEqual(KeyCombo.togglePanel.modifiers, [.control, .option])
         XCTAssertEqual(KeyCombo.togglePanel.key, "T")
         XCTAssertEqual(KeyCombo.addTask.keyCode, UInt32(kVK_ANSI_N))
-        XCTAssertEqual(KeyCombo.addTask.modifiers, [.control, .option, .command])
+        XCTAssertEqual(KeyCombo.addTask.modifiers, [.control, .option])
         XCTAssertEqual(KeyCombo.addTask.key, "N")
         // Two identical combos can't both register — the second RegisterEventHotKey fails.
         XCTAssertNotEqual(KeyCombo.togglePanel, KeyCombo.addTask)
@@ -23,15 +23,15 @@ final class HotKeyTests: XCTestCase {
         XCTAssertEqual(combo([.shift]).carbonModifiers, UInt32(shiftKey))
         XCTAssertEqual(combo([.option]).carbonModifiers, UInt32(optionKey))
         XCTAssertEqual(combo([.control]).carbonModifiers, UInt32(controlKey))
-        XCTAssertEqual(KeyCombo.togglePanel.carbonModifiers, UInt32(controlKey | optionKey | cmdKey))
+        XCTAssertEqual(KeyCombo.togglePanel.carbonModifiers, UInt32(controlKey | optionKey))
         // Flags Carbon has no notion of (caps lock, function) must not leak into the mask.
         XCTAssertEqual(combo([.command, .capsLock, .function]).carbonModifiers, UInt32(cmdKey))
     }
 
     func testDisplayStringUsesMacSymbolOrder() {
         // macOS convention: ⌃ ⌥ ⇧ ⌘ then the key.
-        XCTAssertEqual(KeyCombo.togglePanel.displayString, "⌃⌥⌘T")
-        XCTAssertEqual(KeyCombo.addTask.displayString, "⌃⌥⌘N")
+        XCTAssertEqual(KeyCombo.togglePanel.displayString, "⌃⌥T")
+        XCTAssertEqual(KeyCombo.addTask.displayString, "⌃⌥N")
         XCTAssertEqual(KeyCombo(keyCode: 0, modifiers: [.command, .shift, .option, .control], key: "T").displayString,
                        "⌃⌥⇧⌘T")
     }
