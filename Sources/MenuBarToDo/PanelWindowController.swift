@@ -475,8 +475,11 @@ final class SurfaceView: NSView {
         ctx.translateBy(x: 0, y: size.height)
         ctx.scaleBy(x: 1, y: -1)
         ctx.draw(image, in: CGRect(origin: .zero, size: size))
+        if SurfaceView.beadGrid {
+            // Same rect as the scene, so bead cell (x, y) lies exactly on scene pixel (x, y).
+            ctx.draw(beadOverlay(rows: scene.totalH), in: CGRect(origin: .zero, size: size))
+        }
         ctx.restoreGState()
-        if SurfaceView.beadGrid { drawBeadGrid(ctx) }
         // Dark scrim from below the computer so the content (white text) stays readable
         // and the ground below the scene fades out instead of showing as a flat green slab.
         let nominal = CGFloat(scene.H) * SurfaceView.pixelSize
@@ -503,21 +506,41 @@ final class SurfaceView: NSView {
         return c.makeImage()!
     }()
 
-    private func drawBeadGrid(_ ctx: CGContext) {
-        let s = SurfaceView.pixelSize
-        var callbacks = CGPatternCallbacks(version: 0, drawPattern: { _, c in
-            c.draw(SurfaceView.beadTile, in: CGRect(x: 0, y: 0, width: SurfaceView.pixelSize, height: SurfaceView.pixelSize))
-        }, releaseInfo: nil)
-        guard let pattern = CGPattern(info: nil, bounds: CGRect(x: 0, y: 0, width: s, height: s),
-                                      matrix: .identity, xStep: s, yStep: s, tiling: .constantSpacing,
-                                      isColored: true, callbacks: &callbacks),
-              let space = CGColorSpace(patternBaseSpace: nil) else { return }
-        ctx.saveGState()
-        ctx.setFillColorSpace(space)
-        var alpha: CGFloat = 1
-        ctx.setFillPattern(pattern, colorComponents: &alpha)
-        ctx.fill(bounds)
-        ctx.restoreGState()
+    /// The bead grid as one image the size of the scene, drawn over it with the same
+    /// rect. It used to be a `CGPattern` fill: a pattern (like `draw(byTiling:)`) is
+    /// anchored to the context's *base* space — the window's backing store — not to the
+    /// view, so on screen the 2 pt tiles landed 1 px off against the 2 pt scene pixels
+    /// for some panel heights. The dark ring of every bead then cut through the middle
+    /// of the scene pixels instead of framing them, and the whole panel read as darker
+    /// after a resize. (`cacheDisplay` renders were always aligned, which is why the
+    /// PNG dumps never showed it.) An image placed by rect is positioned in user space,
+    /// exactly like the scene image it covers.
+    private var beadOverlayCache: (scale: CGFloat, rows: Int, image: CGImage)?
+
+    private func beadOverlay(rows: Int) -> CGImage {
+        let scale = window?.backingScaleFactor ?? 2
+        if let cached = beadOverlayCache, cached.scale == scale, cached.rows == rows { return cached.image }
+        let cell = Int(SurfaceView.pixelSize * scale)
+        let cols = Int(Theme.panelWidth / SurfaceView.pixelSize)
+        let width = cols * cell, height = rows * cell
+        func context(_ w: Int, _ h: Int) -> CGContext {
+            CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        }
+        // One row of beads, then that strip repeated: far fewer draws than one per cell.
+        let strip = context(width, cell)
+        strip.interpolationQuality = .default
+        for x in 0..<cols {
+            strip.draw(SurfaceView.beadTile, in: CGRect(x: x * cell, y: 0, width: cell, height: cell))
+        }
+        let stripImage = strip.makeImage()!
+        let full = context(width, height)
+        for y in 0..<rows {
+            full.draw(stripImage, in: CGRect(x: 0, y: y * cell, width: width, height: cell))
+        }
+        let image = full.makeImage()!
+        beadOverlayCache = (scale, rows, image)
+        return image
     }
 }
 
