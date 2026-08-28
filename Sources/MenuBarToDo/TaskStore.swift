@@ -401,6 +401,9 @@ final class TaskStore {
 
     /// Calendar tap: first tap sets the start, a later tap after it sets the end.
     func selectCalendarDay(_ day: Day) {
+        // Nothing can fall due before today. The cell is disabled too; this is the
+        // guard behind it, so the rule holds however the day arrives.
+        guard day >= today else { return }
         if let start = draft.due, draft.due2 == nil, day > start {
             draft.due2 = day
         } else {

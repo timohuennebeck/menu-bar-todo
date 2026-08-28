@@ -700,3 +700,39 @@ final class DuePicksTests: XCTestCase {
         XCTAssertEqual(picks(today, today).selection, .today)
     }
 }
+
+final class PastDueDateTests: XCTestCase {
+    private func store() -> TaskStore {
+        let s = TaskStore(persistence: nil)
+        s.openAdd()
+        return s
+    }
+
+    /// Nothing can be due before today, so a past cell must not change the draft — the
+    /// cell is disabled in the UI, and this is the guard behind it.
+    func testAPastDayCannotBeSelected() {
+        let s = store()
+        s.selectCalendarDay(Day.today.adding(-1))
+        XCTAssertEqual(s.draft.due, Day.today, "the draft's date must be untouched")
+        XCTAssertNil(s.draft.due2)
+    }
+
+    func testTodayAndLaterStillSelect() {
+        let s = store()
+        s.selectCalendarDay(Day.today)
+        XCTAssertEqual(s.draft.due, Day.today)
+        s.selectCalendarDay(Day.today.adding(4))
+        XCTAssertEqual(s.draft.due2, Day.today.adding(4), "a later day closes the range")
+    }
+
+    /// The guard must not fire on the range path either: a past end date is already
+    /// impossible (it has to be after the start), but a past *start* must be refused
+    /// before it can begin a range.
+    func testAPastDayCannotStartARange() {
+        let s = store()
+        s.clearDue()
+        s.selectCalendarDay(Day.today.adding(-3))
+        XCTAssertNil(s.draft.due)
+    }
+}
+

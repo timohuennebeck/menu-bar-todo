@@ -68,13 +68,19 @@ struct CalendarView: View {
             }
             .padding(EdgeInsets(top: 6, leading: 12, bottom: 11, trailing: 12))
         }
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5))
         // Taps on the card's own chrome (weekday row, month label, gaps between days)
         // must not fall through to the panel background, which would collapse the
-        // calendar. Day cells and buttons sit in front and still win.
-        .contentShape(RoundedRectangle(cornerRadius: 16))
-        .onTapGesture {}
+        // calendar. The catcher rides on the card's fill, *behind* the content: as a
+        // contentShape on the card itself it claimed hit testing for the whole area,
+        // which shadowed every child's pointer style — the day cells and the links
+        // all showed the arrow cursor instead of the pointing hand.
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Theme.fieldBackground)
+                .contentShape(RoundedRectangle(cornerRadius: 16))
+                .onTapGesture {}
+        )
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
     }
 
@@ -122,8 +128,10 @@ private struct DayCell: View {
             guard let start = draft.due, let end = draft.due2 else { return false }
             return day > start && day < end
         }()
-        let isToday = day == .today
-        let isPast = day < .today
+        let isToday = day == store.today
+        // `store.today` rather than Day.today so the calendar re-derives when the day
+        // rolls over under a long-running panel.
+        let isPast = day < store.today
 
         Button { store.selectCalendarDay(day) } label: {
             Text("\(day.dayOfMonth)")
@@ -135,7 +143,8 @@ private struct DayCell: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .pointerCursor()
+        .disabled(isPast)
+        .pointerCursor(enabled: !isPast)
         .accessibilityLabel(German.long(day))
     }
 }
