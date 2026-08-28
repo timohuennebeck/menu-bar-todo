@@ -74,6 +74,9 @@ final class PixelScene {
     private let ctx: CGContext
     private let sky: CGContext
     private var t: Double = 0
+    /// Point (in scene pixels, may lie outside the bitmap) the computers look at;
+    /// `nil` looks straight ahead.
+    var lookAt: (x: Double, y: Double)?
 
     private struct Cloud { var x, y: Double; var b: [(Double, Double, Double)]; var s: Double }
     private struct Bush { var x, y, r: Double; var dark: Bool; var ph: Double; var f: (Double, Double)? }
@@ -359,8 +362,26 @@ final class PixelScene {
         rr(sx + 2 * u, sy + 2 * u, sw2 - 4 * u, sh - (5 * S).rounded(), (4 * S).rounded(), s2)
         let bl = (t + phase).truncatingRemainder(dividingBy: 4.3) < 0.16
         let eh = bl ? (2 * S).rounded() : (6 * S).rounded(), ey = sy + (11 * S).rounded() + (bl ? (2 * S).rounded() : 0)
-        R(sx + (9 * S).rounded(), ey, (7 * S).rounded(), eh, fc)
-        R(sx + sw2 - (16 * S).rounded(), ey, (7 * S).rounded(), eh, fc)
+        let ew = (7 * S).rounded(), ex1 = sx + (9 * S).rounded(), ex2 = sx + sw2 - (16 * S).rounded()
+        R(ex1, ey, ew, eh, fc)
+        R(ex2, ey, ew, eh, fc)
+        if !bl {
+            // Pupils: a dark 3×3 block that slides up to 2 px sideways / 1 px vertically
+            // toward `lookAt`; the sigmoid keeps them centred while the mouse is close.
+            let pw = (3 * S).rounded(), mx = ew - pw, my = eh - pw
+            var px = (mx / 2).rounded(), py = (my / 2).rounded()
+            if let l = lookAt {
+                let dx = l.x - (ex1 + ex2 + ew) / 2, dy = l.y - (ey + eh / 2)
+                let d = (dx * dx + dy * dy).squareRoot()
+                if d > 0.5 {
+                    let k = tanh(d / (28 * S)) // 0…1, saturates a little way from the face
+                    px = ((mx / 2) + dx / d * k * (mx / 2)).rounded()
+                    py = ((my / 2) + dy / d * k * (my / 2)).rounded()
+                }
+            }
+            R(ex1 + px, ey + py, pw, pw, s2)
+            R(ex2 + px, ey + py, pw, pw, s2)
+        }
         R(sx + (3 * S).rounded(), sy + (2 * S).rounded(), (3 * S).rounded(), (9 * S).rounded(), s1)
         R(bx + bw / 2 - (5 * S).rounded(), by + (48 * S).rounded(), (10 * S).rounded(), u, bdD)
         R(bx + bw / 2 - (5 * S).rounded(), by + (51 * S).rounded(), (10 * S).rounded(), u, bdD)

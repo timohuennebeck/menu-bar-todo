@@ -362,8 +362,17 @@ final class SurfaceView: NSView {
 
     private func tick() {
         guard let scene else { return }
+        scene.lookAt = mouseInScene()
         frame_ = scene.render(time: CACurrentMediaTime() - started)
         needsDisplay = true
+    }
+
+    /// Current mouse position in scene pixels (polled, so it works while the
+    /// pointer is outside the panel too).
+    private func mouseInScene() -> (x: Double, y: Double)? {
+        guard let window else { return nil }
+        let p = convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+        return (p.x / SurfaceView.pixelSize, p.y / SurfaceView.pixelSize)
     }
 
     override func draw(_ dirtyRect: NSRect) {
