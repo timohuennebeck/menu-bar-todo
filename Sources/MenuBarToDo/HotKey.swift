@@ -11,10 +11,10 @@ struct KeyCombo: Equatable {
     /// key anyway.
     let key: String
 
-    /// ⇧⌘O — show/hide the panel.
-    static let togglePanel = KeyCombo(keyCode: UInt32(kVK_ANSI_O), modifiers: [.command, .shift], key: "O")
-    /// ⇧⌘C — open the panel straight into "Task hinzufügen".
-    static let addTask = KeyCombo(keyCode: UInt32(kVK_ANSI_C), modifiers: [.command, .shift], key: "C")
+    /// ⌃⌥⌘T — show/hide the panel.
+    static let togglePanel = KeyCombo(keyCode: UInt32(kVK_ANSI_T), modifiers: [.control, .option, .command], key: "T")
+    /// ⌃⌥⌘N — open the panel straight into "Task hinzufügen".
+    static let addTask = KeyCombo(keyCode: UInt32(kVK_ANSI_N), modifiers: [.control, .option, .command], key: "N")
 
     /// The modifier mask in Carbon's vocabulary (only the four keys it knows).
     var carbonModifiers: UInt32 {
@@ -26,7 +26,7 @@ struct KeyCombo: Equatable {
         return UInt32(mask)
     }
 
-    /// "⇧⌘C" — the symbols in the order macOS menus use (⌃ ⌥ ⇧ ⌘).
+    /// "⌃⌥⌘N" — the symbols in the order macOS menus use (⌃ ⌥ ⇧ ⌘).
     var displayString: String {
         var text = ""
         if modifiers.contains(.control) { text += "⌃" }

@@ -32,10 +32,10 @@ animating content, coalesced to one frame update per display cycle so nothing ji
   lists last under "Kein Datum". The "Erledigt" list shows "Erledigt am …" and restores with one tap.
 - Tasks persist as JSON in `~/Library/Application Support/MenuBarToDo/tasks.json` (seeded with the design's sample
   data on first launch). A file that fails to load is moved aside as `tasks.corrupt-<timestamp>.json` — never overwritten.
-- Global keyboard shortcuts (work from any app, no Accessibility permission needed): **⇧⌘O** shows/hides the panel,
-  **⇧⌘C** opens it straight into *Task hinzufügen* (a form you are looking at is left alone). Registered via Carbon
+- Global keyboard shortcuts (work from any app, no Accessibility permission needed): **⌃⌥⌘T** shows/hides the panel,
+  **⌃⌥⌘N** opens it straight into *Task hinzufügen* (a form you are looking at is left alone). Registered via Carbon
   `RegisterEventHotKey` in `HotKey.swift`. Caveat: a global hotkey shadows the same shortcut in whichever app is
-  frontmost (⇧⌘O is Xcode's *Open Quickly*, ⇧⌘C Finder's *Computer*); only a clash with another Carbon hotkey is detected, and
+  frontmost, so both sit on ⌃⌥⌘ — a combination almost nothing else binds; only a clash with another Carbon hotkey is detected, and
   that shortcut is then skipped with a log line.
 - Right-click (or Control-click) the status item → *Ein-/Ausblenden*, *Task hinzufügen* (with their shortcuts) and
   *Menu Bar To-Do beenden* to quit.
