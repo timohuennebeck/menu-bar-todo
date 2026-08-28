@@ -507,6 +507,11 @@ final class TaskStore {
             items.insert(TodoTask(title: "Messe-Vorbereitung", due: Day.today.adding(-1), due2: Day.today.adding(4)), at: 0)
             items.append(TodoTask(title: "Urlaub", details: "Bergwandern", due: Day.today.adding(8), due2: Day.today.adding(14)))
             items.append(TodoTask(title: "Ideen für Q4 sammeln"))
+        case "long":
+            // Enough rows to hit the list cap and scroll (for the resize grip).
+            for i in 1...20 {
+                items.append(TodoTask(title: "Aufgabe \(i)", due: Day.today.adding(i % 5)))
+            }
         case "undated":
             items.append(TodoTask(title: "Ideen für Q4 sammeln"))
             items.append(TodoTask(title: "Keller aufräumen", details: "Irgendwann im Herbst"))

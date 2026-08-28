@@ -11,6 +11,7 @@ import UniformTypeIdentifiers
 /// grip handle (with a row-shaped preview).
 struct TaskListView: View {
     @Environment(TaskStore.self) private var store
+    @Environment(PanelSettings.self) private var settings
     @State private var frames = FrameRegistry()
 
     var body: some View {
@@ -30,7 +31,7 @@ struct TaskListView: View {
         // No scroll indicator: with "always show scroll bars" it pops in/out while a row
         // collapses and steals width from the rows. The list still scrolls (wheel/trackpad).
         .scrollIndicators(.never)
-        .frame(maxHeight: Theme.listMaxHeight)
+        .frame(maxHeight: settings.listMaxHeight)
     }
 }
 

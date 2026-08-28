@@ -4,6 +4,9 @@ import SwiftUI
 /// always shows the footer.
 struct PanelView: View {
     @Environment(TaskStore.self) private var store
+    @Environment(PanelSettings.self) private var settings
+    /// List cap when the resize drag started; the drag offset is applied to this.
+    @State private var resizeStart: CGFloat?
     /// Reports the panel's rendered size on every change (including each frame of
     /// a layout animation) so the popover window can follow it exactly.
     var onSizeChange: ((CGSize) -> Void)? = nil
@@ -36,6 +39,16 @@ struct PanelView: View {
         panel
             .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .top)
     }
+
+    /// The most the list may take for a panel with `room` between its top and the
+    /// bottom of its screen: the room minus the chrome above and below the list.
+    static func availableListHeight(room: CGFloat) -> CGFloat {
+        room - PanelWindowController.edgeInset - Theme.sceneBand - PanelView.chromeBelowScene
+    }
+
+    /// Height of everything below the scene band that isn't the list (list header +
+    /// footer, generous), used only to keep the resized panel on screen.
+    static let chromeBelowScene: CGFloat = 90
 
     private var panel: some View {
         VStack(spacing: 0) {
@@ -92,6 +105,17 @@ struct PanelView: View {
                 }
             }
             .padding(8)
+        }
+        // Bottom edge: drag to let the list show more rows before it scrolls.
+        .overlay(alignment: .bottom) {
+            ResizeGripArea(onDrag: { offset, room in
+                let start = resizeStart ?? settings.listMaxHeight
+                resizeStart = start
+                settings.listMaxHeight = PanelSettings.clampListHeight(
+                    start + offset, available: PanelView.availableListHeight(room: room))
+            }, onDragEnded: { resizeStart = nil })
+            .frame(height: ResizeGripArea.thickness)
+            .help("Zum Vergrößern ziehen")
         }
         .environment(\.colorScheme, .dark)
         .frame(width: Theme.panelWidth)

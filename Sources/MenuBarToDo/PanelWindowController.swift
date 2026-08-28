@@ -592,3 +592,62 @@ struct WindowDragArea: NSViewRepresentable {
     func makeNSView(context: Context) -> DragView { DragView() }
     func updateNSView(_ nsView: DragView, context: Context) {}
 }
+
+/// Resize grip along the panel's bottom edge (the Fantastical pattern: a menu bar
+/// panel keeps its width, you drag the bottom to see more rows). Dragging sets
+/// PanelSettings.listMaxHeight; the window then follows the content like it does for
+/// any other content change, top-right anchored, so nothing here touches the frame.
+struct ResizeGripArea: NSViewRepresentable {
+    /// Thickness of the invisible strip that takes the drag.
+    static let thickness: CGFloat = 6
+
+    final class GripView: NSView {
+        var onDrag: ((CGFloat, CGFloat) -> Void)?
+        var onDragEnded: (() -> Void)?
+        private var startY: CGFloat = 0
+
+        /// Points between the panel's top and the bottom of its screen — the most the
+        /// whole panel may be tall without leaving the screen.
+        private var room: CGFloat {
+            guard let window, let screen = window.screen else { return .infinity }
+            return window.frame.maxY - screen.visibleFrame.minY
+        }
+
+        /// Same reason as WindowDragArea: the panel is often clicked while inactive.
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        override func resetCursorRects() {
+            addCursorRect(bounds, cursor: .resizeUpDown)
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            startY = NSEvent.mouseLocation.y
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            // Screen coordinates: the window moves under the pointer while it grows,
+            // so view-local positions would drift. Down on screen = larger list.
+            onDrag?(startY - NSEvent.mouseLocation.y, room)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            onDragEnded?()
+        }
+    }
+
+    /// Called with the drag's total offset so far (points, positive = taller) and the
+    /// room between the panel's top and the bottom of its screen.
+    var onDrag: (CGFloat, CGFloat) -> Void
+    var onDragEnded: () -> Void = {}
+
+    func makeNSView(context: Context) -> GripView {
+        let view = GripView()
+        view.onDrag = onDrag
+        view.onDragEnded = onDragEnded
+        return view
+    }
+    func updateNSView(_ nsView: GripView, context: Context) {
+        nsView.onDrag = onDrag
+        nsView.onDragEnded = onDragEnded
+    }
+}

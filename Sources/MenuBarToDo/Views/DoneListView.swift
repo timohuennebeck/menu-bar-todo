@@ -3,6 +3,7 @@ import SwiftUI
 /// Completed tasks; tapping the check restores a task (due today).
 struct DoneListView: View {
     @Environment(TaskStore.self) private var store
+    @Environment(PanelSettings.self) private var settings
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,7 +32,7 @@ struct DoneListView: View {
                 }
             }
             .scrollIndicators(.never)
-            .frame(maxHeight: Theme.listMaxHeight)
+            .frame(maxHeight: settings.listMaxHeight)
         }
         .padding(.top, 6)
         .padding(.bottom, 4)
