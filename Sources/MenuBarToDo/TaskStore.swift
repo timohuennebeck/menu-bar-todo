@@ -306,11 +306,28 @@ final class TaskStore {
         persist()
     }
 
+    /// The last deleted task, kept so the footer can offer "Rückgängig". Deleting is a
+    /// single click with no confirmation, so this is the only way back; it is dropped by
+    /// the next change (see `persist`), never restoring something minutes later.
+    private var deleted: (task: TodoTask, index: Int)?
+
+    /// Title of the task an undo would bring back, or nil when there is nothing to undo.
+    var undoableDeleteTitle: String? { deleted?.task.title }
+
     func deleteEditingTask() {
-        guard case .edit(let id) = route else { return }
-        items.removeAll { $0.id == id }
+        guard case .edit(let id) = route, let index = items.firstIndex(where: { $0.id == id })
+        else { return }
+        let task = items.remove(at: index)
         draft = Draft()
         route = .list
+        persist()
+        deleted = (task, index) // after persist(), which clears the previous offer
+    }
+
+    /// Puts the last deleted task back where it was.
+    func undoDelete() {
+        guard let deleted else { return }
+        items.insert(deleted.task, at: min(deleted.index, items.count))
         persist()
     }
 
@@ -543,6 +560,20 @@ final class TaskStore {
             for i in 1...20 {
                 items.append(TodoTask(title: "Aufgabe \(i)", due: Day.today.adding(i % 5)))
             }
+        case "long-title":
+            items.removeAll()
+            items.append(TodoTask(title: "Steuerunterlagen für das vergangene Geschäftsjahr zusammenstellen und beim Finanzamt einreichen, inklusive aller Belege",
+                                  details: "Erst die Belege sortieren, dann das Formular ausfüllen, danach alles zusammen einreichen und die Bestätigung ablegen.",
+                                  due: Day.today))
+        case "deleted":
+            // Delete the first task a beat after launch, to show the undo offer.
+            if let first = sortedItems.first {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    guard let self else { return }
+                    self.openEdit(first)
+                    self.deleteEditingTask()
+                }
+            }
         case "undated":
             items.append(TodoTask(title: "Ideen für Q4 sammeln"))
             items.append(TodoTask(title: "Keller aufräumen", details: "Irgendwann im Herbst"))
@@ -578,6 +609,9 @@ final class TaskStore {
     // MARK: - Persistence / seed
 
     private func persist() {
+        // Any change supersedes the offer: "Rückgängig" always means the delete that
+        // just happened, never one from several edits ago.
+        deleted = nil
         collapsedMonths.formIntersection(liveCollapseKeys)
         persistence?.save(Snapshot(items: items, done: done, collapsedMonths: collapsedMonths))
     }

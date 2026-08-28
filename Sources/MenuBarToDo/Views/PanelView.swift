@@ -296,10 +296,20 @@ struct FooterView: View {
 
     var body: some View {
         HStack {
-            // Adding moved to the scene band's +, deleting to the edit form's header;
-            // the footer only carries the way over to the done list.
+            // Deleting is one click with no confirmation, so the way back lives here
+            // until the next change replaces it.
+            if let title = store.undoableDeleteTitle {
+                LinkButton(title: "Rückgängig", kind: .accent) { store.undoDelete() }
+                    .help("„\(title)“ wiederherstellen")
+            }
             Spacer(minLength: 0)
-            LinkButton(title: "Erledigt (\(store.done.count))", kind: .muted) { store.goDone() }
+            // Adding moved to the scene band's +; the footer carries the way to the
+            // done list — and, while it is open, the way back.
+            if store.route == .done {
+                LinkButton(title: "Zurück", kind: .muted) { store.goList() }
+            } else {
+                LinkButton(title: "Erledigt (\(store.done.count))", kind: .muted) { store.goDone() }
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

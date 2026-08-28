@@ -187,11 +187,15 @@ private struct RowView: View {
                     .foregroundStyle(completing ? Theme.muted : Theme.ink)
                     .strikethrough(completing, color: Theme.muted)
                     .lineSpacing(2)
+                    // A pasted paragraph would otherwise stretch one row over the
+                    // whole panel; the full text is in the edit form.
+                    .lineLimit(2)
                 if store.settings.showDescriptions, !task.details.isEmpty {
                     Text(task.details)
                         .font(.system(size: 11.5))
                         .foregroundStyle(Theme.muted)
                         .lineSpacing(2)
+                        .lineLimit(2)
                 }
                 let due = DueLabel.row(for: task.due, task.due2, style: store.settings.dateFormat, today: store.today)
                 HStack(spacing: 4) {

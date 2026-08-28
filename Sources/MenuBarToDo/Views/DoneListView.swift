@@ -77,6 +77,7 @@ private struct DoneRow: View {
                     .foregroundStyle(Theme.muted)
                     .strikethrough()
                     .lineSpacing(2)
+                    .lineLimit(2)
                 if let completedAt = task.completedAt {
                     Text(German.completed(completedAt))
                         .font(.system(size: 11.5))
