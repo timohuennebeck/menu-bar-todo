@@ -201,10 +201,12 @@ struct PrimaryButton: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.onAccent)
+                // Disabled is its own look, not the enabled one at 40 %: the label is dark
+                // green on mint, and faded over the dark ground it simply vanished.
+                .foregroundStyle(enabled ? Theme.onAccent : .white.opacity(0.55))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
-                .background(Theme.blue, in: RoundedRectangle(cornerRadius: 9))
+                .background(enabled ? Theme.blue : Theme.blue.opacity(0.22), in: RoundedRectangle(cornerRadius: 9))
                 .contentShape(RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(.plain)
@@ -212,7 +214,6 @@ struct PrimaryButton: View {
         // Not just dimmed: a hit-testable "disabled" button with a pointer cursor
         // that swallows the click reads as broken.
         .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.4)
         .animation(.easeOut(duration: 0.12), value: enabled)
         .padding(.top, 2)
     }
