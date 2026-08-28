@@ -11,7 +11,7 @@ struct DoneListView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
-                IconButton(symbol: "✕", help: "Schließen") { store.goList() }
+                IconButton(systemImage: "xmark", help: "Schließen", onScene: true) { store.goList() }
             }
             .padding(EdgeInsets(top: 5, leading: 14, bottom: 8, trailing: 14))
 

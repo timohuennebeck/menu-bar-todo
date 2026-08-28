@@ -19,7 +19,7 @@ struct TaskFormView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
-                IconButton(symbol: "✕", help: "Schließen") { store.cancel() }
+                IconButton(systemImage: "xmark", help: "Schließen", onScene: true) { store.cancel() }
             }
             .padding(EdgeInsets(top: 11, leading: 14, bottom: 10, trailing: 14))
 
