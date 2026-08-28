@@ -15,6 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return env["MENUBAR_TODO_PREVIEW_WINDOW"] == "1" || env["MENUBAR_TODO_PREVIEW_ROUTE"] != nil
     }()
     private lazy var store = TaskStore(persistence: Self.isPreviewRun ? nil : .default)
+    /// Window chrome the user controls (currently just the pin). Unlike the store this
+    /// is real UserDefaults even in preview runs — it holds no task data to corrupt.
+    private let panelSettings = PanelSettings()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Accessory apps have no Dock icon and don't take over the menu bar.
@@ -65,7 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var previewWindow: NSWindow?
 
     private func showPreviewWindow() {
-        let host = NSHostingController(rootView: PanelView().environment(store))
+        let host = NSHostingController(rootView: PanelView().environment(store).environment(panelSettings))
         host.sizingOptions = [.preferredContentSize]
         let window = NSWindow(contentViewController: host)
         window.title = "Menu Bar To-Do (Preview)"
@@ -207,8 +210,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // The collapse animation is layout-driven (see TaskListView.collapsible), so the
             // reported size changes every frame and the window simply follows it.
             self?.panel?.resize(to: size)
+        }, onClose: { [weak self] in
+            // `panel` is assigned below, before any click can reach this.
+            self?.panel?.close()
         })
         .environment(store)
+        .environment(panelSettings)
         let panel = PanelWindowController(rootView: root)
         // The status item's own button toggles the panel on mouse-up; the outside-click
         // monitor must not close it on the mouse-down first (that made the click reopen it).
@@ -220,7 +227,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return true }
             return !self.store.route.isForm
         }
+        // Pinned, the panel ignores outside clicks and focus changes; the status item,
+        // ⌃⌘T and Esc still close it (PanelWindowController.dismisses).
+        panel.isPinned = { [weak self] in self?.panelSettings.isPinned ?? false }
         self.panel = panel
+        observePin()
+    }
+
+    /// The pin also changes the window level, which is AppKit state the SwiftUI toggle
+    /// can't set itself. Re-armed after every change, like observeBadge().
+    private func observePin() {
+        withObservationTracking {
+            _ = panelSettings.isPinned
+        } onChange: { [weak self] in
+            DispatchQueue.main.async {
+                self?.panel?.applyPinnedLevel()
+                self?.observePin()
+            }
+        }
     }
 
     /// Screen rect of the status item button (falls back to the top-right screen corner

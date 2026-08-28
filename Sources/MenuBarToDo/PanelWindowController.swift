@@ -50,6 +50,9 @@ final class PanelWindowController {
     /// mouse-*down* monitor closed the panel first and the mouse-up saw it as
     /// closed and reopened it: the icon could never dismiss the panel.
     var shouldIgnoreClick: (NSEvent) -> Bool = { _ in false }
+    /// Whether the user has pinned the panel open (see `dismisses`). Asked per event,
+    /// so toggling the pin while the panel is shown takes effect immediately.
+    var isPinned: () -> Bool = { false }
 
     /// True while the close fade-out runs; the panel is already "closed" for
     /// toggling purposes then.
@@ -142,6 +145,7 @@ final class PanelWindowController {
         if contentSize.height > 0 { resize(to: contentSize, display: false) }
         if PanelWindowController.logsSizes { NSLog("panel window #%ld at %@", window.windowNumber, NSStringFromRect(window.frame)) }
 
+        applyPinnedLevel()
         surface?.start()
         window.alphaValue = 0
         window.orderFrontRegardless()
@@ -157,6 +161,13 @@ final class PanelWindowController {
             window.animator().alphaValue = 1
         }
         installMonitors()
+    }
+
+    /// Closes only if `cause` dismisses the panel in its current pin state; the
+    /// unconditional `close()` stays for the status item and ⌃⌘T.
+    private func close(on cause: Dismissal) {
+        guard PanelWindowController.dismisses(cause, pinned: isPinned()) else { return }
+        close()
     }
 
     func close() {
@@ -178,6 +189,14 @@ final class PanelWindowController {
             self.window.alphaValue = 1
         })
         onClose?()
+    }
+
+    /// A transient popover belongs above menus and popups; a *pinned* panel is a
+    /// utility window the user parked on screen, and at `.popUpMenu` it would cover
+    /// other apps' menus, Spotlight and popovers all day. `.floating` still keeps it
+    /// above normal windows. Call whenever the pin changes.
+    func applyPinnedLevel() {
+        window.level = isPinned() ? .floating : .popUpMenu
     }
 
     // MARK: - Sizing
@@ -249,11 +268,31 @@ final class PanelWindowController {
 
     // MARK: - Dismissal (transient behaviour)
 
+    /// What just happened that *might* close the panel.
+    enum Dismissal: CaseIterable {
+        /// Mouse-down in another application.
+        case outsideClick
+        /// Mouse-down in one of our own windows that isn't the panel.
+        case ownAppClick
+        /// Something else took key status (Cmd-Tab, another window of ours).
+        case resignKey
+        /// The user pressed Esc outside a form.
+        case escape
+    }
+
+    /// The whole pin behaviour: unpinned, the panel is a transient popover and every
+    /// cause dismisses it; pinned, only Esc does. The status item and ⌃⌘T call
+    /// `close()` directly and so always work, pinned or not.
+    nonisolated static func dismisses(_ cause: Dismissal, pinned: Bool) -> Bool {
+        guard pinned else { return true }
+        return cause == .escape
+    }
+
     private func installMonitors() {
         removeMonitors()
         // Clicks in other apps.
         if let global = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown],
-                                                          handler: { [weak self] _ in self?.close() }) {
+                                                          handler: { [weak self] _ in self?.close(on: .outsideClick) }) {
             eventMonitors.append(global)
         }
         // Clicks in our own app outside the panel, and Esc.
@@ -263,12 +302,12 @@ final class PanelWindowController {
             switch event.type {
             case .keyDown where event.keyCode == 53: // Esc
                 if self.window.isKeyWindow, self.shouldCloseOnEscape() {
-                    self.close()
+                    self.close(on: .escape)
                     return nil
                 }
                 return event
             case .leftMouseDown, .rightMouseDown, .otherMouseDown:
-                if event.window !== self.window, !self.shouldIgnoreClick(event) { self.close() }
+                if event.window !== self.window, !self.shouldIgnoreClick(event) { self.close(on: .ownAppClick) }
                 return event
             default:
                 return event
@@ -293,7 +332,7 @@ final class PanelWindowController {
             // Menus/popups keep us key; a real key change means the user moved on.
             DispatchQueue.main.async {
                 if self.window.isVisible, !self.window.isKeyWindow, NSApp.keyWindow !== self.window {
-                    self.close()
+                    self.close(on: .resignKey)
                 }
             }
         })

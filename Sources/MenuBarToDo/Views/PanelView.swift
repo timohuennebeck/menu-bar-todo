@@ -7,6 +7,9 @@ struct PanelView: View {
     /// Reports the panel's rendered size on every change (including each frame of
     /// a layout animation) so the popover window can follow it exactly.
     var onSizeChange: ((CGSize) -> Void)? = nil
+    /// Closes the panel window. Nil in the preview window, which has no panel to close
+    /// (and where the corner ✕ would be a dead control), so the button is dropped there.
+    var onClose: (() -> Void)? = nil
 
     var body: some View {
         // The root adopts *exactly* the size the hosting view proposes, content pinned to
@@ -56,6 +59,20 @@ struct PanelView: View {
                 .frame(height: Theme.sceneBand)
                 .help("Zum Verschieben ziehen")
         }
+        // After the drag grip, so these get the click instead of starting a drag.
+        .overlay(alignment: .topTrailing) {
+            HStack(spacing: 4) {
+                PinButton()
+                if let onClose {
+                    // Closes the window whatever the pin says — the same door as the
+                    // status item and ⌃⌘T. The ✕ in the form/done header means "cancel,
+                    // back to the list" and is a different button.
+                    IconButton(systemImage: "xmark", help: "Fenster schließen",
+                               onScene: true, action: onClose)
+                }
+            }
+            .padding(8)
+        }
         .environment(\.colorScheme, .dark)
         .frame(width: Theme.panelWidth)
         .fixedSize(horizontal: false, vertical: true)
@@ -78,6 +95,37 @@ struct PanelView: View {
                     .onChange(of: geo.size) { _, new in onSizeChange?(new) }
             }
         )
+    }
+}
+
+/// Keeps the panel open when focus moves elsewhere. It lives on the pixel
+/// landscape rather than in a content row so it is there in every route — list,
+/// form, done list and the empty state.
+///
+/// That spot is whatever the scene paints there — bright sky by day, dark by night —
+/// so it wears the shared SceneChip backing: a plain white glyph vanished against
+/// the daytime sky.
+struct PinButton: View {
+    @Environment(PanelSettings.self) private var settings
+    @State private var hovering = false
+
+    var body: some View {
+        Button { settings.isPinned.toggle() } label: {
+            Image(systemName: settings.isPinned ? "pin.fill" : "pin")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(settings.isPinned ? .white : SceneChip.glyph(hovering: hovering))
+                .frame(width: 22, height: 22)
+                .background(SceneChip.background(hovering: hovering), in: SceneChip.shape)
+                .contentShape(SceneChip.shape)
+        }
+        .buttonStyle(.plain)
+        .pointerCursor()
+        .onHover { hovering = $0 }
+        .help(settings.isPinned
+              ? "Angeheftet — bleibt offen (Esc oder ⌃⌘T schließt)"
+              : "Anheften, damit das Fenster offen bleibt")
+        .accessibilityLabel("Anheften")
+        .accessibilityAddTraits(settings.isPinned ? [.isSelected] : [])
     }
 }
 
@@ -107,8 +155,8 @@ struct ListHeaderView: View {
                       : "line.3.horizontal.decrease.circle")
                     .font(.system(size: 15, weight: .medium))
                     .frame(width: 24, height: 22)
-                    .background(hovering ? Theme.hoverBackground : .clear, in: RoundedRectangle(cornerRadius: 6))
-                    .contentShape(RoundedRectangle(cornerRadius: 6))
+                    .background(SceneChip.background(hovering: hovering), in: SceneChip.shape)
+                    .contentShape(SceneChip.shape)
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
@@ -125,7 +173,7 @@ struct ListHeaderView: View {
     }
 
     private var iconColor: Color {
-        store.filter.isActive ? Theme.blue : (hovering ? Theme.ink : Theme.muted)
+        store.filter.isActive ? Theme.accent : SceneChip.glyph(hovering: hovering)
     }
 
     private var countText: String {

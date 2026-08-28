@@ -90,10 +90,31 @@ private struct CursorModifier: ViewModifier {
 
 // MARK: - Shared small components
 
+/// Treatment for the controls that sit directly on the pixel landscape — the pin,
+/// the header ✕ and the filter. The scene behind them is busy and changes with the
+/// hour, so unlike the buttons inside cards they cannot borrow contrast from their
+/// background: the chip is always drawn, not just on hover. Same 6 pt radius as the
+/// hover chips elsewhere.
+enum SceneChip {
+    static let shape = RoundedRectangle(cornerRadius: 6)
+    static func background(hovering: Bool) -> Color { .black.opacity(hovering ? 0.55 : 0.38) }
+    static func glyph(hovering: Bool) -> Color { hovering ? .white : .white.opacity(0.85) }
+}
+
 /// 22×22 "✕"-style icon button with the design's hover treatment.
 struct IconButton: View {
-    let symbol: String
+    /// SF Symbol name, preferred over `symbol`: SwiftUI centres a Text's *line box*
+    /// (ascender→descender), not the glyph's ink, so a character that leaves the
+    /// descender space empty renders visibly high — "✕" at 12 pt sat 0.35 pt above
+    /// centre. SF Symbols are optically centred, and match the pin and filter next
+    /// to them. Sized to the pin's 11 pt semibold.
+    var systemImage: String? = nil
+    /// Literal character, for glyphs with no good SF Symbol (the calendar's ↺).
+    var symbol: String = ""
     let help: String
+    /// Set for the buttons that sit on the landscape rather than in a card; they get
+    /// SceneChip's always-on dark backing instead of the muted hover-only style.
+    var onScene = false
     var tint: Color = Theme.muted
     var hoverTint: Color = Theme.ink
     var hoverBackground: Color = Theme.hoverBackground
@@ -103,18 +124,33 @@ struct IconButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text(symbol)
-                .font(.system(size: 12))
-                .foregroundStyle(hovering ? hoverTint : tint)
+            label
+                .foregroundStyle(glyphColor)
                 .frame(width: 22, height: 22)
-                .background(hovering ? hoverBackground : .clear, in: RoundedRectangle(cornerRadius: 6))
-                .contentShape(RoundedRectangle(cornerRadius: 6))
+                .background(backgroundColor, in: SceneChip.shape)
+                .contentShape(SceneChip.shape)
         }
         .buttonStyle(.plain)
         .pointerCursor()
         .onHover { hovering = $0 }
         .help(help)
         .accessibilityLabel(help)
+    }
+
+    @ViewBuilder private var label: some View {
+        if let systemImage {
+            Image(systemName: systemImage).font(.system(size: 11, weight: .semibold))
+        } else {
+            Text(symbol).font(.system(size: 12))
+        }
+    }
+
+    private var glyphColor: Color {
+        onScene ? SceneChip.glyph(hovering: hovering) : (hovering ? hoverTint : tint)
+    }
+
+    private var backgroundColor: Color {
+        onScene ? SceneChip.background(hovering: hovering) : (hovering ? hoverBackground : .clear)
     }
 }
 
