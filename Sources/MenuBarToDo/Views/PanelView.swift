@@ -11,6 +11,16 @@ struct PanelView: View {
     /// (and where the corner ✕ would be a dead control), so the button is dropped there.
     var onClose: (() -> Void)? = nil
 
+    /// Whether the scene band shows the add button. It appears exactly where the footer
+    /// link used to: never over a form, where it would be a no-op (.add) or would throw
+    /// away what is being edited (.edit).
+    nonisolated static func showsAddButton(for route: Route) -> Bool {
+        switch route {
+        case .list, .done: return true
+        case .add, .edit: return false
+        }
+    }
+
     var body: some View {
         // The root adopts *exactly* the size the hosting view proposes, content pinned to
         // the top. The window follows the reported size one runloop turn later (see
@@ -58,6 +68,16 @@ struct PanelView: View {
             WindowDragArea()
                 .frame(height: Theme.sceneBand)
                 .help("Zum Verschieben ziehen")
+        }
+        // Content action on the left, window chrome on the right. After the drag grip,
+        // so it takes the click instead of starting a drag.
+        .overlay(alignment: .topLeading) {
+            if PanelView.showsAddButton(for: store.route) {
+                IconButton(systemImage: "plus", help: "Task hinzufügen", onScene: true) {
+                    store.openAdd()
+                }
+                .padding(8)
+            }
         }
         // After the drag grip, so these get the click instead of starting a drag.
         .overlay(alignment: .topTrailing) {
@@ -209,14 +229,21 @@ struct FilteredEmptyView: View {
 }
 
 struct EmptyStateView: View {
+    @Environment(TaskStore.self) private var store
+
     var body: some View {
-        VStack(spacing: 3) {
-            Text("Inbox 0, To-Do-Edition")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.ink)
-            Text("Keine offenen Tasks.")
-                .font(.system(size: 11.5))
-                .foregroundStyle(Theme.muted)
+        // With no tasks there is nothing else to click, so the zero state carries its own
+        // call to action rather than sending the user hunting for the band's + icon.
+        VStack(spacing: 10) {
+            VStack(spacing: 3) {
+                Text("Inbox 0, To-Do-Edition")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                Text("Keine offenen Tasks.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.muted)
+            }
+            Chip(title: "Task hinzufügen", style: .accent) { store.openAdd() }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)
@@ -232,12 +259,10 @@ struct FooterView: View {
             switch store.route {
             case .edit:
                 LinkButton(title: "Task löschen", kind: .danger) { store.deleteEditingTask() }
-            case .add:
-                // The form's own submit button already says "Task hinzufügen"; a second
-                // one in the footer would be a duplicate that just reopens the same form.
+            case .add, .list, .done:
+                // Adding moved to the scene band's +; the footer carries only the
+                // destructive link and the way over to the done list.
                 EmptyView()
-            case .list, .done:
-                LinkButton(title: "+ Task hinzufügen") { store.openAdd() }
             }
             Spacer(minLength: 0)
             LinkButton(title: "Erledigt (\(store.done.count))", kind: .muted) { store.goDone() }

@@ -57,3 +57,15 @@ final class WindowDragAreaTests: XCTestCase {
         XCTAssertTrue(WindowDragArea.DragView().acceptsFirstMouse(for: nil))
     }
 }
+
+final class AddButtonRouteTests: XCTestCase {
+    /// The scene band's + replaces the footer link, so it must appear exactly where that
+    /// link did: never over a form, where it would be a no-op (.add) or would throw away
+    /// what is being edited (.edit).
+    func testAddButtonShowsOnlyOutsideForms() {
+        XCTAssertTrue(PanelView.showsAddButton(for: .list))
+        XCTAssertTrue(PanelView.showsAddButton(for: .done))
+        XCTAssertFalse(PanelView.showsAddButton(for: .add))
+        XCTAssertFalse(PanelView.showsAddButton(for: .edit(UUID())))
+    }
+}

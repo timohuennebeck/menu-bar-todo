@@ -52,6 +52,13 @@ final class GlyphCenteringTests: XCTestCase {
     }
 
     @MainActor
+    func testAddGlyphIsCentredInItsChip() throws {
+        let (dx, dy) = try inkOffset(IconButton(systemImage: "plus", help: "", onScene: true) {})
+        XCTAssertEqual(dx, 0, accuracy: tolerance, "+ off-centre horizontally by \(dx) pt")
+        XCTAssertEqual(dy, 0, accuracy: tolerance, "+ off-centre vertically by \(dy) pt")
+    }
+
+    @MainActor
     func testPinGlyphIsCentredInItsChip() throws {
         let settings = PanelSettings(defaults: UserDefaults(suiteName: "GlyphCenteringTests")!)
         let (dx, dy) = try inkOffset(PinButton().environment(settings))
