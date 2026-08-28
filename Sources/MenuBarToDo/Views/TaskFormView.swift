@@ -19,9 +19,6 @@ struct TaskFormView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
-                if mode == .edit {
-                    DeleteTaskButton()
-                }
                 IconButton(systemImage: "xmark", help: "Schließen", onScene: true) { store.cancel() }
             }
             .padding(EdgeInsets(top: 11, leading: 14, bottom: 10, trailing: 14))
@@ -101,6 +98,15 @@ struct TaskFormView: View {
                     // next task gets typed instead of leaving focus on the button.
                     if store.route == .add { titleFocused = true }
                 }
+
+                // Centred under the primary action, where the eye lands last: a quiet
+                // red link rather than a second full-width button, so it can't be
+                // mistaken for "Speichern" or hit by accident. One click, no confirmation.
+                if mode == .edit {
+                    LinkButton(title: "Löschen", kind: .danger) { store.deleteEditingTask() }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 2)
+                }
             }
             .padding(EdgeInsets(top: 0, leading: 14, bottom: 14, trailing: 14))
         }
@@ -154,23 +160,5 @@ private struct DuePickRow: View {
         Chip(title: picks.otherLabel, style: picks.selection == .other ? .selected : .neutral) {
             store.toggleCalendar()
         }
-    }
-}
-
-
-/// Delete in the edit form's header (the macOS convention: deleting belongs to the
-/// object, not the footer). One click deletes — no confirmation: a sheet out of a non-activating panel is
-/// awkward, and a task is quickly recreated. Red on hover says it's destructive.
-private struct DeleteTaskButton: View {
-    @Environment(TaskStore.self) private var store
-    @State private var hovering = false
-
-    var body: some View {
-        IconButton(systemImage: "trash", help: "Aufgabe löschen", onScene: true,
-                   glyph: hovering ? Theme.red : nil) {
-            store.deleteEditingTask()
-        }
-        .onHover { hovering = $0 }
-        .accessibilityLabel("Aufgabe löschen")
     }
 }
