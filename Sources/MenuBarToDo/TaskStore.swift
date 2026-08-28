@@ -93,8 +93,9 @@ final class TaskStore {
         switch persistence?.load() {
         case .loaded(let saved):
             items = saved.items
-            done = saved.done
+            done = TaskStore.prunedDone(saved.done, today: .today)
             collapsedMonths = saved.collapsedMonths
+            if done.count != saved.done.count { persist() }
         case .failed:
             // The unreadable file was moved aside by load(). Start empty instead of
             // masking the failure with demo data, and write nothing until the user
@@ -232,7 +233,37 @@ final class TaskStore {
     }
 
     func goList() { route = .list }
-    func goDone() { route = .done }
+    func goDone() {
+        pruneDone()
+        route = .done
+    }
+
+    // MARK: - Done retention
+
+    /// Completed tasks are kept this many days, then dropped — the done list is a
+    /// recent history, not an archive. The done view says so under its header.
+    static let doneRetentionDays = 14
+
+    /// `done` without the tasks completed `doneRetentionDays` or more days before
+    /// `today`. Tasks without a completion date (legacy files) are kept.
+    static func prunedDone(_ done: [DoneTask], today: Day) -> [DoneTask] {
+        done.filter { task in
+            guard let completedAt = task.completedAt else { return true }
+            return today.days(since: completedAt) < doneRetentionDays
+        }
+    }
+
+    /// Applied on load and whenever the done view opens, so a long-running app
+    /// prunes too. Saves only if something went.
+    private func pruneDone() {
+        let pruned = TaskStore.prunedDone(done, today: .today)
+        guard pruned.count != done.count else { return }
+        done = pruned
+        persist()
+    }
+
+    /// Test hook: `done` is read-only outside the store.
+    func replaceDoneForTesting(_ tasks: [DoneTask]) { done = tasks }
 
     // MARK: - Mutations
 

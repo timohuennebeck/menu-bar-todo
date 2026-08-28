@@ -15,7 +15,15 @@ struct DoneListView: View {
                 Spacer(minLength: 0)
                 IconButton(systemImage: "xmark", help: "Schließen", onScene: true) { store.goList() }
             }
-            .padding(EdgeInsets(top: 5, leading: 14, bottom: 8, trailing: 14))
+            .padding(EdgeInsets(top: 5, leading: 14, bottom: 2, trailing: 14))
+
+            // The list is a recent history, not an archive — say so where it's read.
+            Text("Erledigte Aufgaben werden nach \(TaskStore.doneRetentionDays) Tagen automatisch gelöscht.")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.muted2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 8)
 
             ScrollView {
                 VStack(spacing: 0) {
