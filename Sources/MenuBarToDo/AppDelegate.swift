@@ -230,6 +230,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Pinned, the panel ignores outside clicks and focus changes; the status item,
         // ⌃⌘T and Esc still close it (PanelWindowController.dismisses).
         panel.isPinned = { [weak self] in self?.panelSettings.isPinned ?? false }
+        // Ticking a task off sets the computers in the landscape cheering.
+        store.onTaskCompleted = { [weak self] in self?.panel?.celebrate() }
         self.panel = panel
         observePin()
     }

@@ -63,6 +63,9 @@ final class PanelWindowController {
     var isShown: Bool { window.isVisible && !isClosing }
     var windowNumber: Int { window.windowNumber }
 
+    /// Sets the computers in the landscape cheering (a task was ticked off).
+    func celebrate() { surface?.celebrate() }
+
     /// Debug aid: renders the panel's content view (background scene + SwiftUI) to a PNG.
     func dumpPNG(to path: String) {
         guard let view = window.contentView,
@@ -365,12 +368,20 @@ final class SurfaceView: NSView {
     private var frame_: CGImage?
     private var timer: Timer?
     private var started: CFTimeInterval = 0
+    /// Scene time of the last check-off. Kept here rather than on the scene so that
+    /// rebuilding the scene (any panel resize) doesn't restart or lose the cheer.
+    private var celebratedAt: Double?
+
+    func celebrate() { celebratedAt = CACurrentMediaTime() - started }
 
     override var isFlipped: Bool { true }
 
     func start() {
         rebuildScene()
         started = CACurrentMediaTime()
+        // `started` moves, so a stamp from the last time the panel was open would land
+        // at an arbitrary point on the new clock and could fire a stray cheer.
+        celebratedAt = nil
         tick()
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1 / SurfaceView.fps, repeats: true) { [weak self] _ in self?.tick() }
@@ -402,6 +413,7 @@ final class SurfaceView: NSView {
     private func tick() {
         guard let scene else { return }
         scene.lookAt = mouseInScene()
+        scene.celebratedAt = celebratedAt
         frame_ = scene.render(time: CACurrentMediaTime() - started)
         needsDisplay = true
     }

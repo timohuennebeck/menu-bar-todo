@@ -289,6 +289,10 @@ final class TaskStore {
     /// Duration of the row's height collapse.
     static let collapseDuration: TimeInterval = 0.25 * animationScale
 
+    /// Fired the moment a task is ticked off, so the scene can cheer. Restoring one
+    /// from the done list is not a check-off and does not fire it.
+    var onTaskCompleted: (() -> Void)?
+
     func isCompleting(_ id: UUID) -> Bool { completingIDs.contains(id) }
     func isFading(_ id: UUID) -> Bool { fadingIDs.contains(id) }
     func isCollapsing(_ id: UUID) -> Bool { collapsingIDs.contains(id) }
@@ -300,6 +304,9 @@ final class TaskStore {
         guard !completingIDs.contains(id), items.contains(where: { $0.id == id }) else { return }
         completingIDs.insert(id)
         if sound, settings.completionSound { CompletionSound.shared.play() }
+        // Inside the double-click guard, and deliberately not behind the sound setting:
+        // that switch is about sound, not about whether the scene reacts.
+        onTaskCompleted?()
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self else { return }
             self.fadingIDs.insert(id)

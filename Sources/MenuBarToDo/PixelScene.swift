@@ -77,6 +77,11 @@ final class PixelScene {
     /// Point (in scene pixels, may lie outside the bitmap) the computers look at;
     /// `nil` looks straight ahead.
     var lookAt: (x: Double, y: Double)?
+    /// Scene time a task was last ticked off, or nil. Held by SurfaceView rather than
+    /// here (like `lookAt`) so a rebuild mid-cheer picks it up unchanged.
+    var celebratedAt: Double?
+    /// How long the computers cheer for.
+    static let cheerDuration = 0.6
 
     private struct Cloud { var x, y: Double; var b: [(Double, Double, Double)]; var s: Double }
     private struct Bush { var x, y, r: Double; var dark: Bool; var ph: Double; var f: (Double, Double)? }
@@ -339,6 +344,15 @@ final class PixelScene {
     }
 
     /// The retro computer. `scale` is relative to the main one; `cx` is its centre,
+    /// 0…1 over `cheerDuration` after a check-off, 0 otherwise. `delay` staggers the
+    /// small computer so the two don't fire in lockstep. One envelope drives the hop,
+    /// the squint and the screen flash together, so they cannot drift apart.
+    private func cheer(delay: Double = 0) -> Double {
+        guard let at = celebratedAt else { return 0 }
+        let e = (t - at - delay) / PixelScene.cheerDuration
+        return e > 0 && e < 1 ? e : 0
+    }
+
     /// `groundY` where its base sits, `phase` offsets the bob and blink so two
     /// computers don't move in lockstep.
     private func computer(cx: Double, groundY: Double, scale: Double, phase: Double,
@@ -346,11 +360,17 @@ final class PixelScene {
         let Hd = Double(H)
         let S = Hd / 170 * 1.16 * scale, bw = (56 * S).rounded(), bh = (62 * S).rounded()
         let bx = (cx - bw / 2).rounded()
+        let joy = cheer(delay: phase == 0 ? 0 : 0.08)
+        // A hop on top of the idle bob: sin() is 0 at both ends, so it leaves from and
+        // lands on exactly the bob's position instead of snapping.
+        let hop = (sin(.pi * joy) * S * 4).rounded()
         // Three-step bob (-1 / 0 / +1 px), shifted up one step so it never dips below the ground line.
-        let by = groundY - bh + (sin(t * 1.1 + phase) * S * 1.2).rounded() - S.rounded(), u = max(1, S.rounded())
+        let by = groundY - bh + (sin(t * 1.1 + phase) * S * 1.2).rounded() - S.rounded() - hop, u = max(1, S.rounded())
         let (bd, bdL, bdH, bdD) = body, (bz, s1, s2, fc) = face
-        if P.water { R(bx - (4 * S).rounded(), by + bh - (3 * S).rounded(), bw + (8 * S).rounded(), (4 * S).rounded(), P.sh) }
-        else { circ(cx, by + bh - (2 * S).rounded(), Int((bw * 0.46).rounded()), P.sh) }
+        // The shadow belongs to the ground, not to him, so the hop is added back out of it
+        // and it tightens a little while he is in the air.
+        if P.water { R(bx - (4 * S).rounded(), by + hop + bh - (3 * S).rounded(), bw + (8 * S).rounded(), (4 * S).rounded(), P.sh) }
+        else { circ(cx, by + hop + bh - (2 * S).rounded(), Int((bw * 0.46 * (1 - 0.25 * sin(.pi * joy))).rounded()), P.sh) }
         rr(bx, by, bw, bh, (7 * S).rounded(), bd)
         rr(bx, by, bw, (bh * 0.62).rounded(), (7 * S).rounded(), bdL)
         R(bx + (2 * S).rounded(), by + (4 * S).rounded(), (2 * S).rounded(), bh - (12 * S).rounded(), bdH)
@@ -363,9 +383,21 @@ final class PixelScene {
         let bl = (t + phase).truncatingRemainder(dividingBy: 4.3) < 0.16
         let eh = bl ? (2 * S).rounded() : (6 * S).rounded(), ey = sy + (11 * S).rounded() + (bl ? (2 * S).rounded() : 0)
         let ew = (7 * S).rounded(), ex1 = sx + (9 * S).rounded(), ex2 = sx + sw2 - (16 * S).rounded()
-        R(ex1, ey, ew, eh, fc)
-        R(ex2, ey, ew, eh, fc)
-        if !bl {
+        if joy > 0 {
+            // Happy squint: a shallow ∧ per eye. Only ~6 px of eye to work with, so it is
+            // built from three blocks — outer sides one step down from a raised middle —
+            // rather than a drawn curve, which would just alias into a bar.
+            let step = max(1, (S * 1.5).rounded()), side = max(1, (ew / 3).rounded())
+            for ex in [ex1, ex2] {
+                R(ex, ey + (3 * S).rounded() + step, side, step, fc)
+                R(ex + side, ey + (3 * S).rounded(), ew - 2 * side, step, fc)
+                R(ex + ew - side, ey + (3 * S).rounded() + step, side, step, fc)
+            }
+        } else {
+            R(ex1, ey, ew, eh, fc)
+            R(ex2, ey, ew, eh, fc)
+        }
+        if !bl, joy == 0 {
             // Pupils: a dark 3×3 block that slides up to 2 px sideways / 1 px vertically
             // toward `lookAt`; the sigmoid keeps them centred while the mouse is close.
             let pw = (3 * S).rounded(), mx = ew - pw, my = eh - pw
