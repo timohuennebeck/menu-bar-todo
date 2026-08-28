@@ -406,16 +406,31 @@ final class PixelScene {
         bush(Bush(x: fx + 24 * S, y: ground - 1 * S, r: Hd * 0.055, dark: false, ph: 1.7, f: nil))
     }
 
+    /// Frames per second SurfaceView drives this at. The drifting elements below move a
+    /// fixed step per *frame* (as in the original HTML), so turning that into a position
+    /// at `t` seconds needs the rate.
+    static let fps = 18.0
+
+    /// `start` drifted by `step` per frame for `t` seconds, wrapped into `low..<high`.
+    /// Deriving the position instead of accumulating it is what lets the scene be rebuilt
+    /// mid-animation — every panel resize does that — without the frame jumping.
+    private func drift(_ start: Double, step: Double, from low: Double, to high: Double) -> Double {
+        let span = high - low
+        var p = (start - low + step * t * PixelScene.fps).truncatingRemainder(dividingBy: span)
+        if p < 0 { p += span }
+        return p + low
+    }
+
     /// Advances the animation to `time` (seconds) and returns the frame.
     func render(time: Double) -> CGImage {
         t = time
         let Wd = Double(W), Hd = Double(H)
         memcpy(ctx.data, sky.data, W * totalH * 4)
         if P.stars { for s in twk where sin(t * 2 + s.ph) > 0.4 { R(s.x, s.y, 1, 1, "#ffffff") } }
-        for i in clouds.indices {
-            clouds[i].x -= clouds[i].s
-            if clouds[i].x < -Wd * 0.3 { clouds[i].x = Wd * 1.3 }
-            cloud(clouds[i])
+        for c in clouds {
+            var moved = c
+            moved.x = drift(c.x, step: -c.s, from: -Wd * 0.3, to: Wd * 1.3)
+            cloud(moved)
         }
         if P.water {
             let y0 = Int((Hd * 0.56).rounded()), y1 = Int((Hd * 0.76).rounded())
@@ -461,17 +476,14 @@ final class PixelScene {
             if b.c && (i & 3) == 0 { R(b.x + dx, b.y - b.h, u, u, P.fl) }
         }
         if P.water {
-            for i in gulls.indices {
-                gulls[i].x += gulls[i].sp
-                if gulls[i].x > Wd + 8 { gulls[i].x = -8 }
-                let q = gulls[i], yy = q.y + sin(t * 0.8 + q.ph) * 3, f2: Double = sin(t * 5 + q.ph) > 0 ? 1 : 0
-                R(q.x, yy, 1, 1, "#3d4a52"); R(q.x - 2, yy - f2, 1, 1, "#3d4a52"); R(q.x + 2, yy - f2, 1, 1, "#3d4a52")
+            for q in gulls {
+                let x = drift(q.x, step: q.sp, from: -8, to: Wd + 8)
+                let yy = q.y + sin(t * 0.8 + q.ph) * 3, f2: Double = sin(t * 5 + q.ph) > 0 ? 1 : 0
+                R(x, yy, 1, 1, "#3d4a52"); R(x - 2, yy - f2, 1, 1, "#3d4a52"); R(x + 2, yy - f2, 1, 1, "#3d4a52")
             }
         } else {
-            for i in motes.indices {
-                motes[i].y -= motes[i].sp
-                if motes[i].y < Hd * 0.2 { motes[i].y = Hd }
-                let m = motes[i]
+            for var m in motes {
+                m.y = drift(m.y, step: -m.sp, from: Hd * 0.2, to: Hd)
                 if P.stars {
                     if sin(t * 3 + m.ph) > 0 { R(m.x + sin(t + m.ph) * 4, m.y, 1, 1, P.mote) }
                 } else {

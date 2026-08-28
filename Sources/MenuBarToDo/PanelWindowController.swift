@@ -356,7 +356,7 @@ final class PanelWindowController {
 /// the panel is shown.
 final class SurfaceView: NSView {
     static let pixelSize: CGFloat = 2
-    static let fps: Double = 18
+    static let fps = PixelScene.fps
     /// The HTML's "bead grid": a radial shade over each pixel so the scene looks like
     /// fused Perler beads. Drawn as one tile, pattern-filled over the whole view.
     static let beadGrid = true
