@@ -8,9 +8,9 @@ final class HotKeyTests: XCTestCase {
         XCTAssertEqual(KeyCombo.togglePanel.keyCode, UInt32(kVK_ANSI_O))
         XCTAssertEqual(KeyCombo.togglePanel.modifiers, [.command, .shift])
         XCTAssertEqual(KeyCombo.togglePanel.key, "O")
-        XCTAssertEqual(KeyCombo.addTask.keyCode, UInt32(kVK_ANSI_L))
+        XCTAssertEqual(KeyCombo.addTask.keyCode, UInt32(kVK_ANSI_C))
         XCTAssertEqual(KeyCombo.addTask.modifiers, [.command, .shift])
-        XCTAssertEqual(KeyCombo.addTask.key, "L")
+        XCTAssertEqual(KeyCombo.addTask.key, "C")
         // Two identical combos can't both register — the second RegisterEventHotKey fails.
         XCTAssertNotEqual(KeyCombo.togglePanel, KeyCombo.addTask)
     }
@@ -31,7 +31,7 @@ final class HotKeyTests: XCTestCase {
     func testDisplayStringUsesMacSymbolOrder() {
         // macOS convention: ⌃ ⌥ ⇧ ⌘ then the key.
         XCTAssertEqual(KeyCombo.togglePanel.displayString, "⇧⌘O")
-        XCTAssertEqual(KeyCombo.addTask.displayString, "⇧⌘L")
+        XCTAssertEqual(KeyCombo.addTask.displayString, "⇧⌘C")
         XCTAssertEqual(KeyCombo(keyCode: 0, modifiers: [.command, .shift, .option, .control], key: "T").displayString,
                        "⌃⌥⇧⌘T")
     }
