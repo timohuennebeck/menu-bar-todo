@@ -171,7 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Twins of the global hotkeys, with the combination spelled out for discoverability.
         // AppKit reads shift off the *case* of the key equivalent: an uppercase letter
         // draws (and binds) ⇧ even when the mask omits it, so only shifted combos get
-        // the uppercase form — ⌃⌥T would otherwise show up as ⌃⌥⇧T.
+        // the uppercase form — ⌃⌘T would otherwise show up as ⌃⇧⌘T.
         func addShortcut(_ title: String, combo: KeyCombo, action: Selector) {
             let key = combo.modifiers.contains(.shift) ? combo.key : combo.key.lowercased()
             let item = menu.addItem(withTitle: title, action: action, keyEquivalent: key)
