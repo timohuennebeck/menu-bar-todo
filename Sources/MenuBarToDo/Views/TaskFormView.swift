@@ -158,35 +158,20 @@ private struct DuePickRow: View {
 }
 
 
-/// Trash in the edit form's header (the macOS convention: deleting belongs to the
-/// object, not the footer). Two clicks: the first arms it — red, with the question
-/// as its tooltip — the second deletes. Disarms by itself after a moment, so a
-/// stray click never leaves a loaded button behind. No NSAlert: a sheet out of a
-/// non-activating panel is awkward, and a task is quickly recreated anyway.
+/// Delete in the edit form's header (the macOS convention: deleting belongs to the
+/// object, not the footer), drawn as the platform's "remove" glyph rather than a bin.
+/// One click deletes — no confirmation: a sheet out of a non-activating panel is
+/// awkward, and a task is quickly recreated. Red on hover says it's destructive.
 private struct DeleteTaskButton: View {
     @Environment(TaskStore.self) private var store
-    @State private var armed = false
-    @State private var disarm: Task<Void, Never>?
-
-    static let armedFor: Duration = .seconds(3)
+    @State private var hovering = false
 
     var body: some View {
-        IconButton(systemImage: "trash",
-                   help: armed ? "Wirklich löschen? Nochmal klicken" : "Aufgabe löschen",
-                   onScene: true,
-                   glyph: armed ? Theme.red : nil) {
-            if armed {
-                disarm?.cancel()
-                store.deleteEditingTask()
-            } else {
-                armed = true
-                disarm = Task {
-                    try? await Task.sleep(for: DeleteTaskButton.armedFor)
-                    if !Task.isCancelled { armed = false }
-                }
-            }
+        IconButton(systemImage: "minus.circle", help: "Aufgabe löschen", onScene: true,
+                   glyph: hovering ? Theme.red : nil) {
+            store.deleteEditingTask()
         }
-        .animation(.easeOut(duration: 0.12), value: armed)
-        .accessibilityLabel(armed ? "Wirklich löschen?" : "Aufgabe löschen")
+        .onHover { hovering = $0 }
+        .accessibilityLabel("Aufgabe löschen")
     }
 }
