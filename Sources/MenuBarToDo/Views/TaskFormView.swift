@@ -19,6 +19,9 @@ struct TaskFormView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
+                if mode == .edit {
+                    TaskMenuButton()
+                }
                 IconButton(systemImage: "xmark", help: "Schließen", onScene: true) { store.cancel() }
             }
             .padding(EdgeInsets(top: 11, leading: 14, bottom: 10, trailing: 14))
@@ -98,15 +101,6 @@ struct TaskFormView: View {
                     // next task gets typed instead of leaving focus on the button.
                     if store.route == .add { titleFocused = true }
                 }
-
-                // Centred under the primary action, where the eye lands last: a quiet
-                // red link rather than a second full-width button, so it can't be
-                // mistaken for "Speichern" or hit by accident. One click, no confirmation.
-                if mode == .edit {
-                    LinkButton(title: "Löschen", kind: .danger) { store.deleteEditingTask() }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 2)
-                }
             }
             .padding(EdgeInsets(top: 0, leading: 14, bottom: 14, trailing: 14))
         }
@@ -161,4 +155,81 @@ private struct DuePickRow: View {
             store.toggleCalendar()
         }
     }
+}
+
+/// The edit form's "…" menu: destructive and rarely-used actions live behind it rather
+/// than in the form itself, so nothing next to "Speichern" can be hit by accident.
+///
+/// The popup is an AppKit NSMenu, not SwiftUI's `Menu`: the panel is a non-activating
+/// panel, and SwiftUI's Menu simply never opens there — the button takes the hover but
+/// no menu appears. An NSView that pops the menu up itself works, the same way the
+/// drag grip handles its own mouseDown.
+private struct TaskMenuButton: View {
+    @Environment(TaskStore.self) private var store
+    @State private var hovering = false
+
+    var body: some View {
+        Image(systemName: "ellipsis")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(SceneChip.glyph(hovering: hovering))
+            .frame(width: 22, height: 22)
+            .background(SceneChip.background(hovering: hovering), in: SceneChip.shape)
+            .overlay(MenuPopupArea(items: [.init(title: "Löschen", destructive: true) {
+                store.deleteEditingTask()
+            }]))
+            .pointerCursor()
+            .onHover { hovering = $0 }
+            .help("Weitere Aktionen")
+            .accessibilityLabel("Weitere Aktionen")
+    }
+}
+
+/// Invisible click target that pops an NSMenu up under itself.
+struct MenuPopupArea: NSViewRepresentable {
+    struct Item {
+        let title: String
+        var destructive = false
+        let action: () -> Void
+    }
+
+    final class MenuView: NSView {
+        var items: [Item] = []
+
+        /// Flipped, so the popup point below is the button's *bottom* edge. Unflipped it
+        /// lands above the button, putting the first item under the pointer — releasing
+        /// the same click then picks it, which for a destructive item is a trap.
+        override var isFlipped: Bool { true }
+
+        /// Like the drag grip: the panel is often clicked while the app is inactive, and
+        /// AppKit would otherwise swallow that first click as the activating one.
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        override func mouseDown(with event: NSEvent) {
+            let menu = NSMenu()
+            for (index, item) in items.enumerated() {
+                let entry = NSMenuItem(title: item.title, action: #selector(fire(_:)), keyEquivalent: "")
+                entry.target = self
+                entry.tag = index
+                if item.destructive {
+                    entry.attributedTitle = NSAttributedString(
+                        string: item.title, attributes: [.foregroundColor: NSColor.systemRed])
+                }
+                menu.addItem(entry)
+            }
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: bounds.height + 4), in: self)
+        }
+
+        @objc private func fire(_ sender: NSMenuItem) {
+            items[sender.tag].action()
+        }
+    }
+
+    let items: [Item]
+
+    func makeNSView(context: Context) -> MenuView {
+        let view = MenuView()
+        view.items = items
+        return view
+    }
+    func updateNSView(_ nsView: MenuView, context: Context) { nsView.items = items }
 }
