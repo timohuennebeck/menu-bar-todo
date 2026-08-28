@@ -102,7 +102,7 @@ struct PanelView: View {
         // so it takes the click instead of starting a drag.
         .overlay(alignment: .topLeading) {
             if PanelView.showsAddButton(for: store.route) {
-                IconButton(systemImage: "plus", help: "Task hinzufügen", onScene: true) {
+                IconButton(systemImage: "plus", help: "Aufgabe hinzufügen", onScene: true) {
                     store.openAdd()
                 }
                 .padding(8)
@@ -255,8 +255,8 @@ struct FilteredEmptyView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Text(store.items.count == 1
-                     ? "1 offener Task ist ausgeblendet."
-                     : "\(store.items.count) offene Tasks sind ausgeblendet.")
+                     ? "1 offene Aufgabe ist ausgeblendet."
+                     : "\(store.items.count) offene Aufgaben sind ausgeblendet.")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.muted)
             }
@@ -279,11 +279,11 @@ struct EmptyStateView: View {
                 Text("Inbox 0, To-Do-Edition")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
-                Text("Keine offenen Tasks.")
+                Text("Keine offenen Aufgaben.")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.muted)
             }
-            Chip(title: "Task hinzufügen", style: .accent) { store.openAdd() }
+            Chip(title: "Aufgabe hinzufügen", style: .accent) { store.openAdd() }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)
@@ -296,14 +296,8 @@ struct FooterView: View {
 
     var body: some View {
         HStack {
-            switch store.route {
-            case .edit:
-                LinkButton(title: "Task löschen", kind: .danger) { store.deleteEditingTask() }
-            case .add, .list, .done:
-                // Adding moved to the scene band's +; the footer carries only the
-                // destructive link and the way over to the done list.
-                EmptyView()
-            }
+            // Adding moved to the scene band's +, deleting to the edit form's header;
+            // the footer only carries the way over to the done list.
             Spacer(minLength: 0)
             LinkButton(title: "Erledigt (\(store.done.count))", kind: .muted) { store.goDone() }
         }

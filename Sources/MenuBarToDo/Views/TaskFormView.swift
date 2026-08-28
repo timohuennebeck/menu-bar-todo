@@ -15,10 +15,13 @@ struct TaskFormView: View {
 
         VStack(spacing: 0) {
             HStack {
-                Text(mode == .add ? "Task hinzufügen" : "Task bearbeiten")
+                Text(mode == .add ? "Aufgabe hinzufügen" : "Aufgabe bearbeiten")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer(minLength: 0)
+                if mode == .edit {
+                    DeleteTaskButton()
+                }
                 IconButton(systemImage: "xmark", help: "Schließen", onScene: true) { store.cancel() }
             }
             .padding(EdgeInsets(top: 11, leading: 14, bottom: 10, trailing: 14))
@@ -91,7 +94,7 @@ struct TaskFormView: View {
                         .help("Das Formular bleibt offen, das Fälligkeitsdatum bleibt stehen")
                 }
 
-                PrimaryButton(title: mode == .add ? "Task hinzufügen" : "Speichern",
+                PrimaryButton(title: mode == .add ? "Aufgabe hinzufügen" : "Speichern",
                               enabled: store.draft.isReady) {
                     store.submitDraft()
                     // The form stays open in this mode, so put the caret back where the
@@ -154,3 +157,36 @@ private struct DuePickRow: View {
     }
 }
 
+
+/// Trash in the edit form's header (the macOS convention: deleting belongs to the
+/// object, not the footer). Two clicks: the first arms it — red, with the question
+/// as its tooltip — the second deletes. Disarms by itself after a moment, so a
+/// stray click never leaves a loaded button behind. No NSAlert: a sheet out of a
+/// non-activating panel is awkward, and a task is quickly recreated anyway.
+private struct DeleteTaskButton: View {
+    @Environment(TaskStore.self) private var store
+    @State private var armed = false
+    @State private var disarm: Task<Void, Never>?
+
+    static let armedFor: Duration = .seconds(3)
+
+    var body: some View {
+        IconButton(systemImage: "trash",
+                   help: armed ? "Wirklich löschen? Nochmal klicken" : "Aufgabe löschen",
+                   onScene: true,
+                   glyph: armed ? Theme.red : nil) {
+            if armed {
+                disarm?.cancel()
+                store.deleteEditingTask()
+            } else {
+                armed = true
+                disarm = Task {
+                    try? await Task.sleep(for: DeleteTaskButton.armedFor)
+                    if !Task.isCancelled { armed = false }
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: armed)
+        .accessibilityLabel(armed ? "Wirklich löschen?" : "Aufgabe löschen")
+    }
+}

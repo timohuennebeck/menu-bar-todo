@@ -182,7 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.target = self
         }
         addShortcut("Ein-/Ausblenden", combo: .togglePanel, action: #selector(menuTogglePanel))
-        addShortcut("Task hinzufügen", combo: .addTask, action: #selector(menuAddTask))
+        addShortcut("Aufgabe hinzufügen", combo: .addTask, action: #selector(menuAddTask))
         menu.addItem(.separator())
         menu.addItem(withTitle: "Menu Bar To-Do beenden",
                      action: #selector(NSApplication.terminate(_:)),

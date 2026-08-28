@@ -122,6 +122,8 @@ struct IconButton: View {
     var tint: Color = Theme.muted
     var hoverTint: Color = Theme.ink
     var hoverBackground: Color = Theme.hoverBackground
+    /// Overrides the glyph colour in either style, hovering or not (the armed trash).
+    var glyph: Color? = nil
     let action: () -> Void
 
     @State private var hovering = false
@@ -150,7 +152,8 @@ struct IconButton: View {
     }
 
     private var glyphColor: Color {
-        onScene ? SceneChip.glyph(hovering: hovering) : (hovering ? hoverTint : tint)
+        if let glyph { return glyph }
+        return onScene ? SceneChip.glyph(hovering: hovering) : (hovering ? hoverTint : tint)
     }
 
     private var backgroundColor: Color {
@@ -158,7 +161,7 @@ struct IconButton: View {
     }
 }
 
-/// Text-only footer link ("+ Task hinzufügen", "Erledigt (2)").
+/// Text-only footer link ("+ Aufgabe hinzufügen", "Erledigt (2)").
 struct LinkButton: View {
     enum Kind { case accent, danger, muted }
 
