@@ -50,6 +50,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         print("POPOVER_WINDOW_ID=\(number)")
                         fflush(stdout)
                     }
+                    // MENUBAR_TODO_DUMP_PNG=/path.png writes the rendered panel after a second.
+                    if let path = env["MENUBAR_TODO_DUMP_PNG"] {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                            self?.panel?.dumpPNG(to: path)
+                            print("DUMPED=\(path)"); fflush(stdout)
+                        }
+                    }
                 }
             }
         }

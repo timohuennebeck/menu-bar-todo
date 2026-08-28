@@ -47,6 +47,10 @@ struct PanelView: View {
             }
             FooterView()
         }
+        // Content sits directly on the animated pixel landscape (SurfaceView), below the
+        // scene on its dark ground — hence always light-on-dark, whatever the system theme.
+        .padding(.top, Theme.sceneBand)
+        .environment(\.colorScheme, .dark)
         .frame(width: Theme.panelWidth)
         .fixedSize(horizontal: false, vertical: true)
         // Clicking any non-interactive area (labels, padding, background) ends text editing,

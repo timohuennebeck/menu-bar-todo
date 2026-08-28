@@ -104,8 +104,7 @@ private struct GroupView: View {
                     .foregroundStyle(Theme.blue)
                     .frame(maxWidth: .infinity)
                     .frame(height: 30)
-                    .background(Color(red: 245 / 255, green: 248 / 255, blue: 1).opacity(0.95),
-                                in: RoundedRectangle(cornerRadius: 8))
+                    .background(Theme.accentSoft.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8)
                         .strokeBorder(Theme.blue.opacity(0.45), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
                     .padding(.horizontal, 6)
@@ -161,7 +160,7 @@ private struct RowView: View {
                         .opacity(completing ? 1 : 0)
                     Text("✓")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.onAccent)
                         .scaleEffect(completing ? 1 : 0.4)
                         .opacity(completing ? 1 : 0)
                 }

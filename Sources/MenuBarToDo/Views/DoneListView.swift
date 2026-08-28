@@ -49,7 +49,7 @@ private struct DoneRow: View {
             Button { store.restore(task.id) } label: {
                 Text("✓")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.onAccent)
                     .frame(width: 18, height: 18)
                     .background(Theme.blue, in: Circle())
                     .contentShape(Circle())

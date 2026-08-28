@@ -128,7 +128,7 @@ private struct DayCell: View {
         Button { store.selectCalendarDay(day) } label: {
             Text("\(day.dayOfMonth)")
                 .font(.system(size: 12.5, weight: selected ? .bold : .medium))
-                .foregroundStyle(selected ? .white : inRange ? Theme.blue : isPast ? Theme.line : Theme.ink)
+                .foregroundStyle(selected ? Theme.onAccent : inRange ? Theme.blue : isPast ? Theme.line : Theme.ink)
                 .frame(width: 28, height: 28)
                 .background(selected ? Theme.blue : inRange ? Theme.blue.opacity(0.13) : .clear, in: Circle())
                 .overlay(Circle().strokeBorder(isToday && !selected ? Theme.line : .clear, lineWidth: 1))

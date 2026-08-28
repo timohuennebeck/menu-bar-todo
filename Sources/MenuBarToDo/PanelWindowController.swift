@@ -21,6 +21,7 @@ final class PanelWindowController {
 
     private let window: PanelWindow
     private let host: NSHostingController<AnyView>
+    private var surface: SurfaceView?
     private var eventMonitors: [Any] = []
     private var observers: [NSObjectProtocol] = []
     /// Top-right corner the panel hangs from (screen coordinates).
@@ -50,6 +51,14 @@ final class PanelWindowController {
     var isShown: Bool { window.isVisible && !isClosing }
     var windowNumber: Int { window.windowNumber }
 
+    /// Debug aid: renders the panel's content view (background scene + SwiftUI) to a PNG.
+    func dumpPNG(to path: String) {
+        guard let view = window.contentView,
+              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    }
+
     init(rootView: some View) {
         host = NSHostingController(rootView: AnyView(rootView))
         host.sizingOptions = [] // we size the window from PanelView's reported size
@@ -67,16 +76,9 @@ final class PanelWindowController {
         window.animationBehavior = .none
         window.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle, .fullScreenAuxiliary]
 
-        let effect = NSVisualEffectView()
-        effect.material = .popover
-        effect.blendingMode = .behindWindow
-        effect.state = .active
-        // The blur region is the *mask image*, not the layer's corner radius: with only
-        // `layer.cornerRadius` the material is clipped but the behind-window blur still
-        // covers the full rectangle, leaving a lighter square outside every rounded corner.
-        // The mask's corners are circular, so the layer uses the default curve too — a
-        // `.continuous` layer corner inside a circular mask would show the same artifact.
-        effect.maskImage = PanelWindowController.roundedMask
+        // Flat, opaque surface (no behind-window blur) so the panel reads like a card.
+        let effect = SurfaceView()
+        surface = effect
         effect.wantsLayer = true
         effect.layer?.cornerRadius = PanelWindowController.cornerRadius // clips the SwiftUI content
         effect.layer?.masksToBounds = true
@@ -91,23 +93,6 @@ final class PanelWindowController {
         ])
         window.contentView = effect
     }
-
-    // MARK: - Shape
-
-    /// Resizable rounded-rect mask for the effect view: the corners stay fixed and the
-    /// edges stretch, so one image fits the panel at every height.
-    private static let roundedMask: NSImage = {
-        let radius = PanelWindowController.cornerRadius
-        let side = radius * 2 + 1
-        let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
-            NSColor.black.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
-            return true
-        }
-        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
-        image.resizingMode = .stretch
-        return image
-    }()
 
     // MARK: - Show / hide
 
@@ -134,6 +119,7 @@ final class PanelWindowController {
         if contentSize.height > 0 { resize(to: contentSize, display: false) }
         if PanelWindowController.logsSizes { NSLog("panel window #%ld at %@", window.windowNumber, NSStringFromRect(window.frame)) }
 
+        surface?.start()
         window.alphaValue = 0
         window.orderFrontRegardless()
         window.makeKey()
@@ -157,6 +143,7 @@ final class PanelWindowController {
         let generation = closeGeneration
         pendingFrame = nil // drop any coalesced resize still in flight
         removeMonitors()
+        surface?.stop()
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.10
             window.animator().alphaValue = 0
@@ -288,5 +275,121 @@ final class PanelWindowController {
 
     deinit {
         removeMonitors()
+    }
+}
+
+/// Animated pixel-art landscape behind the panel content. Draws the scene at
+/// `pixelSize` points per scene pixel, anchored to the top edge, and extends the
+/// ground colour below it so any panel height is covered. Only animates while
+/// the panel is shown.
+final class SurfaceView: NSView {
+    static let pixelSize: CGFloat = 2
+    static let fps: Double = 18
+    /// The HTML's "bead grid": a radial shade over each pixel so the scene looks like
+    /// fused Perler beads. Drawn as one tile, pattern-filled over the whole view.
+    static let beadGrid = true
+
+    private var scene: PixelScene?
+    private var frame_: CGImage?
+    private var timer: Timer?
+    private var started: CFTimeInterval = 0
+
+    override var isFlipped: Bool { true }
+
+    func start() {
+        rebuildScene()
+        started = CACurrentMediaTime()
+        tick()
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1 / SurfaceView.fps, repeats: true) { [weak self] _ in self?.tick() }
+        RunLoop.main.add(timer!, forMode: .common)
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    /// The scene's ground continues to the bottom of the view, so it is rebuilt at the
+    /// view's current height (the static parts are seeded, so the layout stays stable).
+    private func rebuildScene() {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let w = Int(Theme.panelWidth / SurfaceView.pixelSize)
+        let total = Int((bounds.height / SurfaceView.pixelSize).rounded(.up))
+        scene = PixelScene(width: w, height: w * 10 / 16, totalHeight: total, kind: PixelScene.kind(forHour: hour))
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        if let scene, Int((newSize.height / SurfaceView.pixelSize).rounded(.up)) != scene.totalH {
+            rebuildScene()
+            if timer != nil { tick() }
+        }
+    }
+
+    private func tick() {
+        guard let scene else { return }
+        frame_ = scene.render(time: CACurrentMediaTime() - started)
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        guard let scene, let image = frame_ else {
+            ctx.setFillColor(Theme.surfaceNSColor.cgColor)
+            ctx.fill(bounds)
+            return
+        }
+        ctx.setFillColor(scene.groundColor.cgColor)
+        ctx.fill(bounds)
+        let size = CGSize(width: CGFloat(scene.W) * SurfaceView.pixelSize,
+                          height: CGFloat(scene.totalH) * SurfaceView.pixelSize)
+        // Flipped view: undo the flip for the image so it isn't drawn upside down.
+        ctx.saveGState()
+        ctx.interpolationQuality = .none
+        ctx.translateBy(x: 0, y: size.height)
+        ctx.scaleBy(x: 1, y: -1)
+        ctx.draw(image, in: CGRect(origin: .zero, size: size))
+        ctx.restoreGState()
+        if SurfaceView.beadGrid { drawBeadGrid(ctx) }
+        // Dark scrim from below the computer to the bottom so the content (white text)
+        // stays readable and the ground below the scene fades out instead of showing
+        // as a flat green slab.
+        let nominal = CGFloat(scene.H) * SurfaceView.pixelSize, top = nominal * 0.5
+        let colors = [CGColor(gray: 0, alpha: 0), CGColor(gray: 0, alpha: 0.5), CGColor(gray: 0, alpha: 0.32)] as CFArray
+        let locations: [CGFloat] = [0, min(1, (nominal - top) / max(1, bounds.height - top)), 1]
+        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceGray(), colors: colors, locations: locations) {
+            ctx.drawLinearGradient(gradient, start: CGPoint(x: 0, y: top), end: CGPoint(x: 0, y: bounds.height), options: [.drawsAfterEndLocation])
+        }
+    }
+
+    private static let beadTile: CGImage = {
+        let n = Int(pixelSize * 4) // draw at 4× and let the pattern scale it down for smooth shading
+        let c = CGContext(data: nil, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n * 4,
+                          space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        // radial-gradient(circle at 50% 50%, transparent 0 32%, rgba(0,0,0,0.28) 78%)
+        let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                           colors: [CGColor(gray: 0, alpha: 0), CGColor(gray: 0, alpha: 0), CGColor(gray: 0, alpha: 0.28), CGColor(gray: 0, alpha: 0.28)] as CFArray,
+                           locations: [0, 0.32, 0.78, 1])!
+        let mid = CGPoint(x: CGFloat(n) / 2, y: CGFloat(n) / 2)
+        c.drawRadialGradient(g, startCenter: mid, startRadius: 0, endCenter: mid, endRadius: CGFloat(n) / 2 * 1.42, options: [.drawsAfterEndLocation])
+        return c.makeImage()!
+    }()
+
+    private func drawBeadGrid(_ ctx: CGContext) {
+        let s = SurfaceView.pixelSize
+        var callbacks = CGPatternCallbacks(version: 0, drawPattern: { _, c in
+            c.draw(SurfaceView.beadTile, in: CGRect(x: 0, y: 0, width: SurfaceView.pixelSize, height: SurfaceView.pixelSize))
+        }, releaseInfo: nil)
+        guard let pattern = CGPattern(info: nil, bounds: CGRect(x: 0, y: 0, width: s, height: s),
+                                      matrix: .identity, xStep: s, yStep: s, tiling: .constantSpacing,
+                                      isColored: true, callbacks: &callbacks),
+              let space = CGColorSpace(patternBaseSpace: nil) else { return }
+        ctx.saveGState()
+        ctx.setFillColorSpace(space)
+        var alpha: CGFloat = 1
+        ctx.setFillPattern(pattern, colorComponents: &alpha)
+        ctx.fill(bounds)
+        ctx.restoreGState()
     }
 }

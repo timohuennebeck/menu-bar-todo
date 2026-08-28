@@ -1,9 +1,17 @@
 import SwiftUI
 
-/// Design tokens from the .dc.html. Text colors use semantic AppKit colors so
-/// the panel stays legible in dark mode; accents keep the design's exact values.
+/// Design tokens: a flat, warm off-white surface with a teal-green accent (after
+/// the "Flow" timer app). Text colors use semantic AppKit colors so the panel stays
+/// legible in dark mode; accents keep the design's exact values.
 enum Theme {
-    static let blue = Color(red: 10 / 255, green: 132 / 255, blue: 255 / 255)        // #0A84FF
+    /// Mint accent (#A8DCCB), readable on the dark ground of the pixel scene. Still
+    /// called `blue` at call sites from the original design; `accent` is preferred.
+    static let accent = Color(red: 168 / 255, green: 220 / 255, blue: 203 / 255)
+    static let blue = accent
+    /// Text/icons drawn on top of a filled accent (deep teal, #173D33).
+    static let onAccent = Color(red: 23 / 255, green: 61 / 255, blue: 51 / 255)
+    /// Soft mint (#BFD3CE) for tinted, inactive accent elements.
+    static let accentSoft = Color(red: 191 / 255, green: 211 / 255, blue: 206 / 255)
     static let red = Color(red: 255 / 255, green: 59 / 255, blue: 48 / 255)          // #FF3B30
 
     static let ink = Color(nsColor: .labelColor)                                     // #1D1D1F
@@ -15,7 +23,14 @@ enum Theme {
     static let chipBackground = Color.primary.opacity(0.055)
     static let hoverBackground = Color.primary.opacity(0.07)
     static let rowHoverBackground = Color.primary.opacity(0.045)
-    static let surface = Color(nsColor: .windowBackgroundColor)
+    static let surface = Color(nsColor: surfaceNSColor)
+    /// Opaque panel background: Flow's off-white (#F2F1F0) in light mode, a matching
+    /// warm dark gray in dark mode.
+    static let surfaceNSColor = NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(red: 30 / 255, green: 30 / 255, blue: 29 / 255, alpha: 1)
+            : NSColor(red: 242 / 255, green: 241 / 255, blue: 240 / 255, alpha: 1)
+    }
 
     static func tone(_ tone: DueTone) -> Color {
         switch tone {
@@ -29,6 +44,10 @@ enum Theme {
     static let panelWidth: CGFloat = 330
     static let listMaxHeight: CGFloat = 410
     static let calendarMaxHeight: CGFloat = 196
+
+    /// Height of the pixel-art band above the content: just enough to keep the
+    /// computer fully in view (see SurfaceView).
+    static let sceneBand: CGFloat = 150
 }
 
 // MARK: - Cursors (the design's `cursor: pointer` / `cursor: grab`)
@@ -142,7 +161,7 @@ struct PrimaryButton: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.onAccent)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
                 .background(Theme.blue, in: RoundedRectangle(cornerRadius: 9))
@@ -188,7 +207,7 @@ struct Chip: View {
     private var foreground: Color {
         switch style {
         case .neutral: return Theme.ink2
-        case .selected: return .white
+        case .selected: return Theme.onAccent
         case .accent: return Theme.blue
         }
     }

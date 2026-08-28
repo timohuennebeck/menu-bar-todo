@@ -1,0 +1,179 @@
+<div style="padding:1rem 0">
+<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">A horizontal animated pixel-art scene of a smiling retro computer, switchable between four settings: day meadow, golden hour, night, and coast.</h2>
+
+<div id="stage" style="position:relative;width:100%;max-width:640px;margin:0 auto;border-radius:12px;overflow:hidden;border:0.5px solid var(--border)">
+  <canvas id="pxc" style="display:block;width:100%;height:auto;image-rendering:pixelated"></canvas>
+  <div id="beads" style="position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 32%, rgba(0,0,0,0.28) 78%);background-size:calc(100%/272) calc(100%/170)"></div>
+</div>
+
+<div id="tabs" style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap">
+  <button data-s="meadow" style="width:auto">Meadow</button>
+  <button data-s="dusk" style="width:auto">Golden hour</button>
+  <button data-s="night" style="width:auto">Night</button>
+  <button data-s="coast" style="width:auto">Coast</button>
+</div>
+
+<div style="display:flex;gap:8px;justify-content:center;align-items:center;margin-top:8px;flex-wrap:wrap">
+  <button id="pp" style="width:auto"><i class="ti ti-player-pause" aria-hidden="true"></i> Pause</button>
+  <button id="bt" style="width:auto"><i class="ti ti-grid-dots" aria-hidden="true"></i> Bead grid</button>
+  <label style="font-size:13px;color:var(--text-secondary);display:flex;align-items:center;gap:8px">Pixel size
+    <input type="range" id="res" min="180" max="400" step="20" value="272" style="width:110px">
+  </label>
+</div>
+
+<script>
+(function(){
+var SC={
+ meadow:{sky:[[46,152,214],[176,222,240]],cl:['#ffffff','#bcdcef'],nC:4,
+  dk:'#1f5c24',md:'#3d8a2a',lt:'#68b03a',fl:'#ffe95c',fl2:'#f5d431',gr:'#2e6d20',
+  rk:'#6c8290',rkd:'#4d616d',bl:'#2e6d20',blL:'#8ec93f',mote:'#fff6c0',sh:'#255a19',
+  bd:'#d9692b',bdL:'#e8813b',bdH:'#f5a45e',bdD:'#b84d1c',bz:'#a34a1f',s1:'#5b2a15',s2:'#4a2011',fc:'#f2913f'},
+ dusk:{sky:[[92,52,120],[250,178,110]],cl:['#ffd9b0','#cf8f8a'],nC:4,sun:1,
+  dk:'#173d33',md:'#2c6446',lt:'#4f8a4a',fl:'#ffcf6b',fl2:'#f0a848',gr:'#1f4a33',
+  rk:'#6b5a70',rkd:'#493a52',bl:'#1f4a33',blL:'#7fa54a',mote:'#ffdca0',sh:'#183b2a',
+  bd:'#c85c2a',bdL:'#df7738',bdH:'#f0a05a',bdD:'#8f3a17',bz:'#8f3a17',s1:'#4d2415',s2:'#3a1a10',fc:'#ffb15c'},
+ night:{sky:[[8,14,40],[38,60,100]],cl:['#3a4a72','#2a3557'],nC:2,stars:1,moon:1,
+  dk:'#0f2a1a',md:'#193d24',lt:'#25532f',fl:'#9fd7ff',fl2:'#6fa8d6',gr:'#12331d',
+  rk:'#3a4656',rkd:'#252e3c',bl:'#12331d',blL:'#2c6b34',mote:'#d6ff8a',sh:'#0b2213',
+  bd:'#8a4020',bdL:'#a05128',bdH:'#c06a38',bdD:'#5c2712',bz:'#5c2712',s1:'#123a3c',s2:'#0d2a2c',fc:'#7fe6d8'},
+ coast:{sky:[[74,168,214],[206,236,242]],cl:['#ffffff','#c6e2ef'],nC:3,water:1,
+  dk:'#3f6b3a',md:'#5d8a3c',lt:'#8bb551',fl:'#f2e6a8',fl2:'#e8d488',gr:'#e6cf9c',
+  rk:'#8a8f92',rkd:'#646b6f',bl:'#5d8a3c',blL:'#a8c96a',mote:'#ffffff',sh:'#c9a76a',
+  bd:'#d9692b',bdL:'#e8813b',bdH:'#f5a45e',bdD:'#b84d1c',bz:'#a34a1f',s1:'#5b2a15',s2:'#4a2011',fc:'#f2913f'}};
+
+var cv=document.getElementById('pxc'),g=cv.getContext('2d');
+var W=272,H=170,t=0,run=true,acc=0,last=0,P=SC.meadow,name='meadow';
+function rnd(a){return function(){a|=0;a=a+0x6D2B79F5|0;var r=Math.imul(a^a>>>15,1|a);r=r+Math.imul(r^r>>>7,61|r)^r;return((r^r>>>14)>>>0)/4294967296}}
+function R(x,y,w,h,c){g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),Math.max(1,Math.round(w)),Math.max(1,Math.round(h)))}
+function circ(cx,cy,r,c){g.fillStyle=c;for(var d=-r;d<=r;d++){var w=Math.floor(Math.sqrt(r*r-d*d));g.fillRect(Math.round(cx-w),Math.round(cy+d),w*2+1,1)}}
+function rr(x,y,w,h,rad,c){g.fillStyle=c;for(var i=0;i<h;i++){var ins=0,k;
+ if(i<rad){k=rad-i-0.5;ins=rad-Math.floor(Math.sqrt(Math.max(0,rad*rad-k*k)))}
+ var b=h-1-i;if(b<rad){k=rad-b-0.5;ins=Math.max(ins,rad-Math.floor(Math.sqrt(Math.max(0,rad*rad-k*k))))}
+ g.fillRect(Math.round(x+ins),Math.round(y+i),Math.max(1,Math.round(w-2*ins)),1)}}
+function poly(p,c){var ys=p.map(function(q){return q[1]}),a=Math.min.apply(0,ys),b=Math.max.apply(0,ys);g.fillStyle=c;
+ for(var y=Math.floor(a);y<=b;y++){var xs=[];
+  for(var i=0;i<p.length;i++){var u=p[i],v=p[(i+1)%p.length];
+   if((u[1]<=y&&v[1]>y)||(v[1]<=y&&u[1]>y))xs.push(u[0]+(y-u[1])/(v[1]-u[1])*(v[0]-u[0]))}
+  xs.sort(function(m,n){return m-n});
+  for(var i=0;i+1<xs.length;i+=2)g.fillRect(Math.round(xs[i]),y,Math.max(1,Math.round(xs[i+1]-xs[i])),1)}}
+
+var sky=document.createElement('canvas'),clouds=[],bushes=[],rocks=[],blades=[],motes=[],twk=[],gulls=[];
+function build(){
+ sky.width=W;sky.height=H;var sg=sky.getContext('2d'),img=sg.createImageData(W,H),d=img.data,bay=[[0,2],[3,1]],hz=H*0.78;
+ for(var y=0;y<H;y++){var f=Math.min(1,y/hz);
+  for(var x=0;x<W;x++){var dd=(bay[y&1][x&1]/4-0.375)*26,o=(y*W+x)*4;
+   for(var i=0;i<3;i++){var v=P.sky[0][i]+(P.sky[1][i]-P.sky[0][i])*f+dd;d[o+i]=Math.max(0,Math.min(255,Math.round(v/17)*17))}
+   d[o+3]=255}}
+ sg.putImageData(img,0,0);
+ var q=rnd(5);
+ if(P.stars){sg.fillStyle='#ffffff';for(var i=0;i<70;i++){var sx=Math.floor(q()*W),sy=Math.floor(q()*H*0.6);
+  sg.globalAlpha=0.4+q()*0.6;sg.fillRect(sx,sy,1,1)}sg.globalAlpha=1}
+ if(P.moon){var mx=W*0.78,my=H*0.2;sg.fillStyle='#f2ecd0';
+  for(var dy=-9;dy<=9;dy++){var w=Math.floor(Math.sqrt(81-dy*dy));sg.fillRect(Math.round(mx-w),Math.round(my+dy),w*2+1,1)}
+  sg.fillStyle='#dcd4b4';sg.fillRect(mx-3,my-3,3,3);sg.fillRect(mx+2,my+3,2,2)}
+ if(P.sun){var ux=W*0.30,uy=H*0.52;sg.fillStyle='#ffe0a8';
+  for(var dy=-13;dy<=13;dy++){var w=Math.floor(Math.sqrt(169-dy*dy));sg.fillRect(Math.round(ux-w),Math.round(uy+dy),w*2+1,1)}}
+ clouds=[];var r=rnd(P.water?13:7);
+ for(var i=0;i<P.nC;i++){var n=5+Math.floor(r()*4),b=[],sp=W*(0.14+r()*0.13);
+  for(var j=0;j<n;j++)b.push([(j/(n-1)-0.5)*sp,(r()-0.5)*H*0.05,H*(0.05+r()*0.06)]);
+  clouds.push({x:r()*W*1.4-W*0.2,y:H*(0.08+r()*0.26),b:b,s:0.05+r()*0.08})}
+ bushes=[];
+ function mass(x0,x1,y0,y1,n,seed){var p=rnd(seed);for(var i=0;i<n;i++){var px=x0+p()*(x1-x0),py=y0+p()*(y1-y0),rad=H*(0.035+p()*0.06);
+  bushes.push({x:px,y:py,r:rad,dark:p()<0.45,ph:p()*6.28,f:p()<0.5?[px+(p()-0.5)*rad,py-rad*0.55]:null})}}
+ if(!P.water){mass(-W*0.04,W*0.30,H*0.55,H*0.76,30,3);mass(W*0.70,W*1.04,H*0.52,H*0.74,28,9)}
+ mass(-W*0.04,W*1.04,H*0.78,H*1.04,P.water?18:46,15);
+ rocks=[[[0.01,0.66],[0.06,0.58],[0.12,0.66],[0.11,0.78],[0.02,0.78]],
+        [[0.86,0.80],[0.93,0.74],[1.00,0.81],[0.99,0.92],[0.87,0.91]],
+        [[0.14,0.84],[0.20,0.79],[0.25,0.87],[0.19,0.93],[0.12,0.91]]];
+ blades=[];var r3=rnd(33),nb=Math.round(W*(P.water?0.35:0.95));
+ for(var i=0;i<nb;i++)blades.push({x:r3()*W,y:H*(0.80+r3()*0.22),h:H*(0.03+r3()*0.07),ph:r3()*6.28,c:r3()<0.35});
+ motes=[];var r4=rnd(41);
+ for(var i=0;i<14;i++)motes.push({x:r4()*W,y:r4()*H,ph:r4()*6.28,sp:0.06+r4()*0.12});
+ twk=[];var r5=rnd(51);for(var i=0;i<10;i++)twk.push({x:Math.floor(r5()*W),y:Math.floor(r5()*H*0.55),ph:r5()*6.28});
+ gulls=[];var r6=rnd(61);for(var i=0;i<3;i++)gulls.push({x:r6()*W,y:H*(0.12+r6()*0.2),sp:0.14+r6()*0.1,ph:r6()*6.28});
+}
+
+function cloud(c){for(var i=0;i<c.b.length;i++)circ(c.x+c.b[i][0],c.y+c.b[i][1]+c.b[i][2]*0.35,Math.round(c.b[i][2]*0.85),P.cl[1]);
+ for(var i=0;i<c.b.length;i++)circ(c.x+c.b[i][0],c.y+c.b[i][1],Math.round(c.b[i][2]),P.cl[0]);
+ for(var i=0;i<c.b.length;i++)circ(c.x+c.b[i][0],c.y+c.b[i][1]-c.b[i][2]*0.25,Math.round(c.b[i][2]*0.5),P.cl[0])}
+
+function bush(b){var sw=Math.sin(t*0.9+b.ph)*(H/170)*1.1,u=Math.max(1,Math.round(H/170*2));
+ circ(b.x+sw,b.y,Math.round(b.r),b.dark?P.dk:P.md);
+ circ(b.x+sw-b.r*0.25,b.y-b.r*0.3,Math.round(b.r*0.55),b.dark?P.md:P.lt);
+ if(b.f){R(b.f[0]+sw,b.f[1],u,u,P.fl2);R(b.f[0]+sw+u*1.6,b.f[1]+u*1.6,u,u,P.fl)}}
+
+function mac(){
+ var S=H/170*1.16,bw=Math.round(56*S),bh=Math.round(62*S),bx=Math.round(W/2-bw/2),
+     by=Math.round(H*0.30)+Math.round(Math.sin(t*1.1)*S*1.2),u=Math.max(1,Math.round(S));
+ if(P.water)R(bx-Math.round(4*S),by+bh-Math.round(3*S),bw+Math.round(8*S),Math.round(4*S),P.sh);
+ else circ(W/2,by+bh-Math.round(2*S),Math.round(bw*0.46),P.sh);
+ rr(bx,by,bw,bh,Math.round(7*S),P.bd);
+ rr(bx,by,bw,Math.round(bh*0.62),Math.round(7*S),P.bdL);
+ R(bx+Math.round(2*S),by+Math.round(4*S),Math.round(2*S),bh-Math.round(12*S),P.bdH);
+ R(bx+bw-Math.round(4*S),by+Math.round(6*S),Math.round(3*S),bh-Math.round(16*S),P.bdD);
+ for(var i=0;i<3;i++)R(bx+bw-Math.round(9*S),by+Math.round((15+i*4)*S),Math.round(4*S),Math.round(2*S),P.bdD);
+ var sx=bx+Math.round(6*S),sy=by+Math.round(6*S),sw2=bw-Math.round(12*S),sh=Math.round(34*S);
+ rr(sx,sy,sw2,sh,Math.round(5*S),P.bz);
+ rr(sx+u,sy+u,sw2-2*u,sh-2*u,Math.round(4*S),P.s1);
+ rr(sx+2*u,sy+2*u,sw2-4*u,sh-Math.round(5*S),Math.round(4*S),P.s2);
+ var bl=(t%4.3)<0.16,eh=bl?Math.round(2*S):Math.round(6*S),ey=sy+Math.round(11*S)+(bl?Math.round(2*S):0);
+ R(sx+Math.round(9*S),ey,Math.round(7*S),eh,P.fc);
+ R(sx+sw2-Math.round(16*S),ey,Math.round(7*S),eh,P.fc);
+ var mw=Math.round(20*S),mx=sx+sw2/2-mw/2,my=sy+Math.round(24*S),th=Math.max(1,Math.round(2*S));
+ for(var i=0;i<mw;i++){var yy=my-Math.round(Math.sin(Math.PI*i/(mw-1))*4.5*S);
+  R(mx+i,yy,1,th,P.fc);R(mx+i,yy+th,1,u,P.bz)}
+ R(sx+Math.round(3*S),sy+Math.round(2*S),Math.round(3*S),Math.round(9*S),P.s1);
+ R(bx+bw/2-Math.round(5*S),by+Math.round(48*S),Math.round(10*S),u,P.bdD);
+ R(bx+bw/2-Math.round(5*S),by+Math.round(51*S),Math.round(10*S),u,P.bdD)}
+
+function frame(){
+ g.drawImage(sky,0,0);
+ if(P.stars)for(var i=0;i<twk.length;i++){var s=twk[i];if(Math.sin(t*2+s.ph)>0.4)R(s.x,s.y,1,1,'#ffffff')}
+ for(var i=0;i<clouds.length;i++){var c=clouds[i];c.x-=c.s;if(c.x<-W*0.3)c.x=W*1.3;cloud(c)}
+ if(P.water){var y0=Math.round(H*0.56),y1=Math.round(H*0.76);
+  for(var y=y0;y<y1;y++){var f=(y-y0)/(y1-y0),cr=Math.round(29+(87-29)*f),cg=Math.round(110+(184-110)*f),cb=Math.round(168+(214-168)*f);
+   R(0,y,W,1,'rgb('+cr+','+cg+','+cb+')')}
+  for(var i=0;i<9;i++){var wy=y0+3+i*Math.round((y1-y0)/9),ph=i*1.7,off=(t*(6+i))%(W+40);
+   for(var k=0;k<4;k++)R((off+k*70+Math.sin(t*1.4+ph)*4)%(W+30)-15,wy,Math.round(W*0.045),1,'#d8f0f8')}
+  R(0,y1,W,H-y1,P.gr);
+  var r7=rnd(77);for(var i=0;i<Math.round(W*1.2);i++)R(r7()*W,y1+r7()*(H-y1),1,1,r7()<0.5?'#cfae74':'#f2e0b4');
+  R(0,y1,W,2,'#c49a63')}
+ else{R(0,Math.round(H*0.74),W,H,P.gr);
+  for(var i=0;i<bushes.length;i++)if(bushes[i].y<=H*0.78)bush(bushes[i]);
+  for(var i=0;i<2;i++){var p=rocks[i].map(function(q){return[q[0]*W,q[1]*H]});
+   poly(p,P.rk);poly(p.map(function(q,k){return[q[0]+(k<2?0:2),q[1]+3]}),P.rkd)}}
+ mac();
+ for(var i=0;i<bushes.length;i++)if(bushes[i].y>H*0.78)bush(bushes[i]);
+ if(!P.water){var p3=rocks[2].map(function(q){return[q[0]*W,q[1]*H]});poly(p3,P.rk)}
+ var u=Math.max(1,Math.round(H/170*2));
+ for(var i=0;i<blades.length;i++){var b=blades[i],dx=Math.sin(t*1.6+b.ph)*(H/170)*1.7;
+  g.fillStyle=b.c?P.blL:P.bl;
+  for(var k=0;k<b.h;k++)g.fillRect(Math.round(b.x+dx*(k/b.h)),Math.round(b.y-k),1,1);
+  if(b.c&&(i&3)===0)R(b.x+dx,b.y-b.h,u,u,P.fl)}
+ if(P.water){for(var i=0;i<gulls.length;i++){var q2=gulls[i];q2.x+=q2.sp;if(q2.x>W+8)q2.x=-8;
+  var yy=q2.y+Math.sin(t*0.8+q2.ph)*3,f2=Math.sin(t*5+q2.ph)>0?1:0;
+  R(q2.x,yy,1,1,'#3d4a52');R(q2.x-2,yy-f2,1,1,'#3d4a52');R(q2.x+2,yy-f2,1,1,'#3d4a52')}}
+ else for(var i=0;i<motes.length;i++){var m=motes[i];m.y-=m.sp;if(m.y<H*0.2)m.y=H;
+  if(P.stars){if(Math.sin(t*3+m.ph)>0)R(m.x+Math.sin(t+m.ph)*4,m.y,1,1,P.mote)}
+  else R(m.x+Math.sin(t+m.ph)*3,m.y,1,1,P.mote)}}
+
+function setSize(w){W=w;H=Math.round(w*10/16);cv.width=W;cv.height=H;
+ document.getElementById('beads').style.backgroundSize='calc(100%/'+W+') calc(100%/'+H+')';build();frame()}
+function loop(ts){if(!last)last=ts;var dt=(ts-last)/1000;last=ts;
+ if(run){acc+=dt;if(acc>1/18){t+=acc;acc=0;frame()}}requestAnimationFrame(loop)}
+
+var tabs=document.getElementById('tabs');
+function paint(){var b=tabs.querySelectorAll('button');for(var i=0;i<b.length;i++){
+ var on=b[i].getAttribute('data-s')===name;b[i].style.background=on?'var(--surface-1)':'transparent';
+ b[i].style.borderColor=on?'var(--border-accent)':'var(--border-strong)';b[i].style.color=on?'var(--text-accent)':'var(--text-primary)'}}
+tabs.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+ name=b.getAttribute('data-s');P=SC[name];build();frame();paint()});
+document.getElementById('pp').onclick=function(){run=!run;
+ this.innerHTML=run?'<i class="ti ti-player-pause" aria-hidden="true"></i> Pause':'<i class="ti ti-player-play" aria-hidden="true"></i> Play'};
+document.getElementById('bt').onclick=function(){var b=document.getElementById('beads');
+ b.style.display=b.style.display==='none'?'block':'none'};
+document.getElementById('res').oninput=function(){setSize(parseInt(this.value,10))};
+setSize(272);paint();requestAnimationFrame(loop);
+})();
+</script>
+</div>
