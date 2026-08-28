@@ -458,7 +458,10 @@ final class SurfaceView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         guard let scene, let image = frame_ else {
-            ctx.setFillColor(Theme.surfaceNSColor.cgColor)
+            // Explicitly the dark surface, not the appearance-dependent one: the panel's
+            // content is always dark, and in light mode the dynamic colour resolves to
+            // near-white — a white panel for the frame before the first scene render.
+            ctx.setFillColor(Theme.surfaceDarkNSColor.cgColor)
             ctx.fill(bounds)
             return
         }
@@ -474,14 +477,16 @@ final class SurfaceView: NSView {
         ctx.draw(image, in: CGRect(origin: .zero, size: size))
         ctx.restoreGState()
         if SurfaceView.beadGrid { drawBeadGrid(ctx) }
-        // Dark scrim from below the computer to the bottom so the content (white text)
-        // stays readable and the ground below the scene fades out instead of showing
-        // as a flat green slab.
-        let nominal = CGFloat(scene.H) * SurfaceView.pixelSize, top = nominal * 0.5
-        let colors = [CGColor(gray: 0, alpha: 0), CGColor(gray: 0, alpha: 0.5), CGColor(gray: 0, alpha: 0.32)] as CFArray
-        let locations: [CGFloat] = [0, min(1, (nominal - top) / max(1, bounds.height - top)), 1]
-        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceGray(), colors: colors, locations: locations) {
-            ctx.drawLinearGradient(gradient, start: CGPoint(x: 0, y: top), end: CGPoint(x: 0, y: bounds.height), options: [.drawsAfterEndLocation])
+        // Dark scrim from below the computer so the content (white text) stays readable
+        // and the ground below the scene fades out instead of showing as a flat green slab.
+        let nominal = CGFloat(scene.H) * SurfaceView.pixelSize
+        let colors = [CGColor(gray: 0, alpha: 0), CGColor(gray: 0, alpha: Scrim.mid), CGColor(gray: 0, alpha: Scrim.end)] as CFArray
+        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceGray(), colors: colors,
+                                     locations: Scrim.locations(nominal: nominal)) {
+            ctx.drawLinearGradient(gradient,
+                                   start: CGPoint(x: 0, y: Scrim.top(nominal: nominal)),
+                                   end: CGPoint(x: 0, y: Scrim.fadeEnd(nominal: nominal)),
+                                   options: [.drawsAfterEndLocation])
         }
     }
 
@@ -513,6 +518,36 @@ final class SurfaceView: NSView {
         ctx.setFillPattern(pattern, colorComponents: &alpha)
         ctx.fill(bounds)
         ctx.restoreGState()
+    }
+}
+
+/// Geometry of the scrim over the scene, anchored to the scene and never to the view's
+/// height. It used to end at `bounds.height`, which stretched the 0.5 → 0.32 ramp over
+/// whatever the panel happened to measure: every resize — a group collapsing, a route
+/// change — moved the end point and so changed the alpha at *every* point below the
+/// scene, which reads as the overlay darkening and lightening as the panel grows and
+/// shrinks. Past `fadeEnd` the last alpha simply holds (`.drawsAfterEndLocation`).
+enum Scrim {
+    /// Alpha where the ramp peaks (level with the bottom of the scene) and where it settles.
+    static let mid: CGFloat = 0.5
+    static let end: CGFloat = 0.32
+    /// The scrim starts half way down the scene, so the sky stays clear.
+    static func top(nominal: CGFloat) -> CGFloat { nominal * 0.5 }
+    /// A fixed distance below the scene, chosen to sit inside the usual panel heights.
+    static func fadeEnd(nominal: CGFloat) -> CGFloat { nominal * 2.5 }
+
+    static func locations(nominal: CGFloat) -> [CGFloat] {
+        let top = top(nominal: nominal), end = fadeEnd(nominal: nominal)
+        return [0, (nominal - top) / (end - top), 1]
+    }
+
+    /// The alpha the scrim paints at `y`, for tests and for reasoning about the shape.
+    static func alpha(at y: CGFloat, nominal: CGFloat) -> CGFloat {
+        let top = top(nominal: nominal), end = fadeEnd(nominal: nominal)
+        if y <= top { return 0 }
+        if y >= end { return self.end }          // held, which is what makes it height-independent
+        if y <= nominal { return mid * (y - top) / (nominal - top) }
+        return mid + (self.end - mid) * (y - nominal) / (end - nominal)
     }
 }
 

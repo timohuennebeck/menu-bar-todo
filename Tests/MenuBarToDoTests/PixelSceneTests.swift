@@ -36,6 +36,22 @@ final class PixelSceneTests: XCTestCase {
         }
     }
 
+    /// Growing the panel must reveal more ground, not redraw it. The pebbles' count and
+    /// spread were derived from the panel's height and the roots stopped consuming their
+    /// RNG at the bottom edge, so every resize reshuffled the whole underground — the
+    /// soil twitched while a group collapsed.
+    func testGrowingTheSceneKeepsTheGroundItAlreadyDrew() {
+        let short = PixelScene(width: 165, height: 165 * 10 / 16, totalHeight: 240, kind: .meadow)
+        let tall = PixelScene(width: 165, height: 165 * 10 / 16, totalHeight: 400, kind: .meadow)
+        let a = short.render(time: 2.0), b = tall.render(time: 2.0)
+
+        let overlap = CGRect(x: 0, y: 0, width: 165, height: 240)
+        let cropA = try! XCTUnwrap(a.cropping(to: overlap))
+        let cropB = try! XCTUnwrap(b.cropping(to: overlap))
+        XCTAssertEqual(pixels(cropA), pixels(cropB),
+                       "the ground is redrawn differently when the panel is taller")
+    }
+
     /// The frame is a pure function of time, so it must also be reproducible out of order.
     func testFrameDependsOnlyOnTime() {
         let a = scene(.meadow), b = scene(.meadow)

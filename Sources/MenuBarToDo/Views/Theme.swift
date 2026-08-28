@@ -27,10 +27,14 @@ enum Theme {
     /// Opaque panel background: Flow's off-white (#F2F1F0) in light mode, a matching
     /// warm dark gray in dark mode.
     static let surfaceNSColor = NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(red: 30 / 255, green: 30 / 255, blue: 29 / 255, alpha: 1)
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? surfaceDarkNSColor
             : NSColor(red: 242 / 255, green: 241 / 255, blue: 240 / 255, alpha: 1)
     }
+    /// The dark variant on its own, for the AppKit views under the panel's content.
+    /// PanelView forces `colorScheme: .dark`, but a plain NSView resolves a dynamic
+    /// colour against the *system* appearance — so in light mode `surfaceNSColor`
+    /// hands back near-white, which is not a colour this panel ever wants to paint.
+    static let surfaceDarkNSColor = NSColor(red: 30 / 255, green: 30 / 255, blue: 29 / 255, alpha: 1)
 
     static func tone(_ tone: DueTone) -> Color {
         switch tone {

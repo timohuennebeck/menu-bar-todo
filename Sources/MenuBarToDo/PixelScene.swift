@@ -273,6 +273,13 @@ final class PixelScene {
         for _ in 0..<3 { gulls.append(Gull(x: r6.next() * Wd, y: Hd * (0.12 + r6.next() * 0.2), sp: 0.14 + r6.next() * 0.1, ph: r6.next() * 6.28)) }
     }
 
+    /// How deep the underground is *generated*, in scene pixels, regardless of how much
+    /// of it the panel currently shows. Anything below the panel is clipped by the
+    /// context. Deriving this from the panel's height instead reshuffled the whole
+    /// pattern on every resize, because both the pebble count and the roots' RNG
+    /// consumption changed with it.
+    private static let groundDepth = 600
+
     /// Soil with roots and pebbles for the rows below the scene, baked into `sky`
     /// (the static background) so the animation loop doesn't pay for it.
     private func underground() {
@@ -292,8 +299,9 @@ final class PixelScene {
         }
         // Pebbles.
         var rp = Rnd(97)
-        for _ in 0..<((totalH - top) * W / 700) {
-            let x = Double(Int(rp.next() * Wd)), y = Double(top + 3 + Int(rp.next() * Double(totalH - top - 3)))
+        for _ in 0..<(PixelScene.groundDepth * W / 700) {
+            let x = Double(Int(rp.next() * Wd))
+            let y = Double(top + 3 + Int(rp.next() * Double(PixelScene.groundDepth - 3)))
             let big = rp.next() < 0.3
             fill(sky, P.pebble); rect(sky, x, y, big ? 3 : 2, big ? 2 : 1)
             fill(sky, P.soil.1); rect(sky, x, y + (big ? 2 : 1), big ? 3 : 2, 1)
@@ -304,7 +312,9 @@ final class PixelScene {
             var x = x0, dx = drift
             for i in 0..<length {
                 let y = y0 + i
-                if y >= totalH { break }
+                // Deliberately no early exit below the visible depth: stopping here left
+                // the RNG in a different state, so a taller panel changed every root
+                // after this one. The context clips what falls outside.
                 if rr.next() < 0.35 { dx += (rr.next() - 0.5) * 1.2 }
                 dx = max(-1.2, min(1.2, dx))
                 x += Int(dx.rounded())
