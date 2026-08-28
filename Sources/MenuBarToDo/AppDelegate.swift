@@ -222,10 +222,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.shouldIgnoreClick = { [weak self] event in
             event.window === self?.statusItem?.button?.window
         }
-        // Esc inside a form cancels the form (SwiftUI's onExitCommand); elsewhere it closes the panel.
-        panel.shouldCloseOnEscape = { [weak self] in
-            guard let self else { return true }
-            return !self.store.route.isForm
+        // Esc leaves a focused text field first (PanelWindowController), then cancels a
+        // form (SwiftUI's onExitCommand), then closes the panel.
+        panel.onEscape = { [weak self] in
+            guard let self, self.store.route.isForm else { return false }
+            self.store.cancel()
+            return true
         }
         // Pinned, the panel ignores outside clicks and focus changes; the status item,
         // ⌃⌘T and Esc still close it (PanelWindowController.dismisses).

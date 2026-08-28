@@ -83,7 +83,6 @@ struct TaskFormView: View {
             }
             .padding(EdgeInsets(top: 0, leading: 14, bottom: 14, trailing: 14))
         }
-        .onExitCommand { store.cancel() }
         .onAppear {
             // The popover becomes key a beat after it appears; defer focus accordingly.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { titleFocused = true }

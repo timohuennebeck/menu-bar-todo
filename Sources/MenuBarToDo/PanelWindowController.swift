@@ -43,8 +43,11 @@ final class PanelWindowController {
 
     /// Called when the panel closed for any reason (outside click, Esc, …).
     var onClose: (() -> Void)?
-    /// Asked before Esc closes the panel; return false to let SwiftUI handle it (e.g. cancel a form).
-    var shouldCloseOnEscape: () -> Bool = { true }
+    /// Esc with no text field focused. Return true if it was dealt with (a form
+    /// cancelled); false lets the panel close. It cannot be left to SwiftUI's
+    /// onExitCommand: the first Esc resigns first responder, which takes the SwiftUI
+    /// view out of the responder chain, and the next Esc would then reach nothing.
+    var onEscape: () -> Bool = { false }
     /// Clicks the dismissal monitors must NOT treat as "outside" — the status
     /// item's own button, whose mouse-up toggles the panel. Without this, the
     /// mouse-*down* monitor closed the panel first and the mouse-up saw it as
@@ -304,13 +307,21 @@ final class PanelWindowController {
             guard let self else { return event }
             switch event.type {
             case .keyDown where event.keyCode == 53: // Esc
-                if self.window.isKeyWindow, self.shouldCloseOnEscape() {
-                    self.close(on: .escape)
-                    return nil
-                }
-                return event
+                // Esc escalates: leave the text field, then cancel the form, then close
+                // the panel. Without the first step a single Esc cancelled the whole
+                // form, losing what had been typed.
+                guard self.window.isKeyWindow else { return event }
+                if self.resignFocusedText() { return nil }
+                if self.onEscape() { return nil }
+                self.close(on: .escape)
+                return nil
             case .leftMouseDown, .rightMouseDown, .otherMouseDown:
                 if event.window !== self.window, !self.shouldIgnoreClick(event) { self.close(on: .ownAppClick) }
+                // A click anywhere in the panel that isn't in the focused field ends
+                // editing, the way clicking off an input does on the web. The monitor
+                // sees this before the views do, so buttons, chips and rows are covered
+                // too — a background tap gesture can only catch the gaps between them.
+                if event.window === self.window { self.resignTextIfClickOutside(event) }
                 return event
             default:
                 return event
@@ -339,6 +350,24 @@ final class PanelWindowController {
                 }
             }
         })
+    }
+
+    /// Ends text editing if a text field has focus. Returns whether it did.
+    @discardableResult
+    private func resignFocusedText() -> Bool {
+        guard window.firstResponder is NSTextView else { return false }
+        window.makeFirstResponder(nil)
+        return true
+    }
+
+    /// Same, unless the click landed inside the field being edited.
+    private func resignTextIfClickOutside(_ event: NSEvent) {
+        guard let editor = window.firstResponder as? NSTextView else { return }
+        // The field editor covers only the text; `delegate` is the field itself, whose
+        // frame includes its padding — clicking a field's own inset must not blur it.
+        let target = (editor.delegate as? NSView) ?? editor
+        let point = target.convert(event.locationInWindow, from: nil)
+        if !target.bounds.contains(point) { window.makeFirstResponder(nil) }
     }
 
     private func removeMonitors() {
