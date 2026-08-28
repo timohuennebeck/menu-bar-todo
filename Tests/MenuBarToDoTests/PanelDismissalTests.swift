@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import MenuBarToDo
 
@@ -42,5 +43,17 @@ final class PanelSettingsTests: XCTestCase {
 
         PanelSettings(defaults: defaults).isPinned = false
         XCTAssertFalse(PanelSettings(defaults: defaults).isPinned)
+    }
+}
+
+final class WindowDragAreaTests: XCTestCase {
+    /// The scene band must start a window drag on the *first* click, even while the app
+    /// is inactive. NSView refuses first mouse by default, so that click is swallowed as
+    /// the activating click and never reaches mouseDown — leaving the grip dead until
+    /// you click once to focus. Only reachable since the panel can stay open unfocused
+    /// (pinned); before that an outside click just closed it.
+    @MainActor
+    func testDragGripAcceptsFirstMouse() {
+        XCTAssertTrue(WindowDragArea.DragView().acceptsFirstMouse(for: nil))
     }
 }

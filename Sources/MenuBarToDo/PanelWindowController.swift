@@ -479,6 +479,13 @@ final class SurfaceView: NSView {
 /// the scene band at the top so it never competes with the rows' reorder drag.
 struct WindowDragArea: NSViewRepresentable {
     final class DragView: NSView {
+        /// Without this the grip is dead until the panel is focused: AppKit swallows the
+        /// first click into an inactive app as the activating click, so `mouseDown` never
+        /// runs and the drag never starts. The panel is a non-activating panel that can
+        /// now sit open while another app is frontmost (pinned), so that first click is
+        /// the common case, not an edge case.
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
         override func mouseDown(with event: NSEvent) {
             window?.performDrag(with: event)
         }
