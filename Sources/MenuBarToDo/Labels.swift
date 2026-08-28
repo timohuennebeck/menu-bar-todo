@@ -146,3 +146,31 @@ struct DueLabel: Equatable {
         }
     }
 }
+
+/// State of the add form's quick-pick row: Heute · Morgen · a third chip that opens
+/// the calendar. The first two cover almost every task; anything else names itself on
+/// the third chip, so the row can always show what the draft is actually set to.
+struct DuePicks: Equatable {
+    enum Selection: Equatable { case none, today, tomorrow, other }
+
+    var selection: Selection
+    /// The third chip's title: the chosen date once there is one, else an invitation.
+    var otherLabel: String
+
+    static let prompt = "Datum …"
+
+    static func make(due: Day?, due2: Day?, today: Day = .today) -> DuePicks {
+        guard let due else { return DuePicks(selection: .none, otherLabel: prompt) }
+        // A range can start today without *being* today: the first two chips set a
+        // single day, so a selected "Heute" would misrepresent what is stored.
+        if let due2, due2 != due {
+            return DuePicks(selection: .other, otherLabel: German.rangeText(due, due2))
+        }
+        switch due.days(since: today) {
+        case 0: return DuePicks(selection: .today, otherLabel: prompt)
+        case 1: return DuePicks(selection: .tomorrow, otherLabel: prompt)
+        default: return DuePicks(selection: .other, otherLabel: German.rangeText(due, nil))
+        }
+    }
+}
+

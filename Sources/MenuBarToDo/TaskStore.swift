@@ -67,6 +67,10 @@ final class TaskStore {
 
     var route: Route = .list
     var draft = Draft()
+    /// "Erstelle mehrere": keep the add form open after each task instead of returning
+    /// to the list. Deliberately not persisted — a forgotten mode would quietly change
+    /// what the submit button does days later; `openAdd` starts it off every time.
+    var createsMultiple = false
     var filter: TaskFilter = .none
     /// Month groups the user folded up (`TaskGroup.collapseKey`s). Persisted.
     private(set) var collapsedMonths: Set<String> = []
@@ -213,6 +217,7 @@ final class TaskStore {
 
     func openAdd() {
         draft = Draft()
+        createsMultiple = false
         route = .add
     }
 
@@ -246,8 +251,14 @@ final class TaskStore {
                               details: draft.details.trimmingCharacters(in: .whitespacesAndNewlines),
                               due: draft.due,
                               due2: draft.due2))
-        draft = Draft()
-        route = .list
+        if createsMultiple {
+            // Only the text clears: a batch is usually several things for the same day,
+            // so re-picking the date every time would be the tedious part.
+            draft = Draft(title: "", details: "", due: draft.due, due2: draft.due2)
+        } else {
+            draft = Draft()
+            route = .list
+        }
         persist()
     }
 
@@ -406,6 +417,13 @@ final class TaskStore {
         draft.due2 = nil
         draft.calendarOpen = false
     }
+    /// Quick-pick: one exact day, replacing any range, and the calendar has had its say.
+    func setDue(_ day: Day) {
+        draft.due = day
+        draft.due2 = nil
+        draft.calendarOpen = false
+    }
+
     func toggleCalendar() { draft.calendarOpen.toggle() }
 
     /// Collapses the calendar; called for any click outside it (panel background,

@@ -608,3 +608,95 @@ final class StatusIconTests: XCTestCase {
         XCTAssertEqual(StatusIcon.badgeText(12), "9+")
     }
 }
+
+final class CreateMultipleTests: XCTestCase {
+    private func makeStore() -> TaskStore { TaskStore(persistence: nil) }
+
+    private func fill(_ store: TaskStore, _ title: String, due: Day) {
+        store.draft.title = title
+        store.draft.details = "Notiz"
+        store.draft.due = due
+    }
+
+    /// Off (the default): adding a task returns to the list, as it always has.
+    func testAddingOnceReturnsToTheList() {
+        let store = makeStore()
+        store.openAdd()
+        fill(store, "Zahnarzt", due: Day.today.adding(3))
+        store.addTask()
+        XCTAssertEqual(store.route, .list)
+        XCTAssertEqual(store.draft.title, "")
+        XCTAssertEqual(store.draft.due, Day.today, "a fresh draft starts on today again")
+    }
+
+    /// On: the form stays open with the text cleared, but the due date carries over —
+    /// a batch is usually several things for the same day.
+    func testCreatingMultipleKeepsTheFormAndTheDueDate() {
+        let store = makeStore()
+        store.openAdd()
+        store.createsMultiple = true
+        let friday = Day.today.adding(3)
+        fill(store, "Zahnarzt", due: friday)
+        store.addTask()
+
+        XCTAssertEqual(store.route, .add, "the form stays open")
+        XCTAssertEqual(store.draft.title, "")
+        XCTAssertEqual(store.draft.details, "")
+        XCTAssertEqual(store.draft.due, friday, "the due date carries over")
+        XCTAssertEqual(store.items.last?.title, "Zahnarzt")
+
+        fill(store, "Bericht", due: friday)
+        store.addTask()
+        XCTAssertEqual(store.items.suffix(2).map(\.title), ["Zahnarzt", "Bericht"])
+    }
+
+    /// The mode is deliberately not sticky: opening the add form starts it off again.
+    func testOpeningTheFormResetsTheMode() {
+        let store = makeStore()
+        store.createsMultiple = true
+        store.openAdd()
+        XCTAssertFalse(store.createsMultiple)
+    }
+}
+
+final class DuePicksTests: XCTestCase {
+    private let today = Day(date(2026, 8, 28))
+
+    private func picks(_ due: Day?, _ due2: Day? = nil) -> DuePicks {
+        DuePicks.make(due: due, due2: due2, today: today)
+    }
+
+    func testTodayAndTomorrowSelectTheirOwnChip() {
+        XCTAssertEqual(picks(today).selection, .today)
+        XCTAssertEqual(picks(today.adding(1)).selection, .tomorrow)
+    }
+
+    /// With no due date nothing is selected, and the third chip invites a choice
+    /// rather than claiming one.
+    func testNoDueDateSelectsNothing() {
+        XCTAssertEqual(picks(nil).selection, .none)
+        XCTAssertEqual(picks(nil).otherLabel, "Datum …")
+    }
+
+    /// Any other single day lands on the third chip, which then names the date —
+    /// otherwise the row would show a selection the user cannot read.
+    func testAnyOtherDayNamesItselfOnTheThirdChip() {
+        let picked = picks(today.adding(5))
+        XCTAssertEqual(picked.selection, .other)
+        XCTAssertEqual(picked.otherLabel, German.rangeText(today.adding(5), nil))
+        XCTAssertNotEqual(picked.otherLabel, "Datum …")
+    }
+
+    /// A range is never "today" even when it starts today: the first two chips set a
+    /// single day, so showing one of them selected would misrepresent the draft.
+    func testARangeAlwaysBelongsToTheThirdChip() {
+        let range = picks(today, today.adding(3))
+        XCTAssertEqual(range.selection, .other)
+        XCTAssertEqual(range.otherLabel, German.rangeText(today, today.adding(3)))
+    }
+
+    /// A "range" whose ends are the same day is just that day.
+    func testDegenerateRangeIsTreatedAsASingleDay() {
+        XCTAssertEqual(picks(today, today).selection, .today)
+    }
+}

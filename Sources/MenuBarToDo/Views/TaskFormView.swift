@@ -33,7 +33,10 @@ struct TaskFormView: View {
                     .background(fieldBackground(focused: titleFocused), in: RoundedRectangle(cornerRadius: 9))
                     .overlay(focusRing(titleFocused))
                     .focused($titleFocused)
-                    .onSubmit { store.submitDraft() }
+                    .onSubmit {
+                        store.submitDraft()
+                        if store.route == .add { titleFocused = true }
+                    }
                     .simultaneousGesture(TapGesture().onEnded { store.closeCalendar() })
 
                 ZStack(alignment: .topLeading) {
@@ -63,22 +66,37 @@ struct TaskFormView: View {
                 .simultaneousGesture(TapGesture().onEnded { store.closeCalendar() })
 
                 VStack(alignment: .leading, spacing: 6) {
-                    SectionLabel(text: "Fällig")
-                    HStack(spacing: 6) {
-                        Chip(title: store.draft.due.map { German.rangeText($0, store.draft.due2) } ?? "Kein Datum",
-                             style: .accent) {
-                            store.toggleCalendar()
-                        }
-                        Spacer(minLength: 0)
-                    }
+                    DuePickRow()
                     if store.draft.calendarOpen {
                         CalendarView()
                     }
                 }
 
+                if mode == .add {
+                    // Left-aligned so the label starts where the fields do, with the
+                    // switch beside it rather than adrift at the far edge. The extra
+                    // space above separates it from the task's own data: this row
+                    // changes what the button below does, so it groups with the button.
+                    // Everything in this stack is 10 pt apart, which reads tighter
+                    // between two small rows than between two bordered fields.
+                    Toggle("Erstelle mehrere", isOn: $store.createsMultiple)
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                        .tint(Theme.accent)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.ink2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .pointerCursor()
+                        .padding(.top, 6)
+                        .help("Das Formular bleibt offen, das Fälligkeitsdatum bleibt stehen")
+                }
+
                 PrimaryButton(title: mode == .add ? "Task hinzufügen" : "Speichern",
                               enabled: store.draft.isReady) {
                     store.submitDraft()
+                    // The form stays open in this mode, so put the caret back where the
+                    // next task gets typed instead of leaving focus on the button.
+                    if store.route == .add { titleFocused = true }
                 }
             }
             .padding(EdgeInsets(top: 0, leading: 14, bottom: 14, trailing: 14))
@@ -100,3 +118,39 @@ struct TaskFormView: View {
             .allowsHitTesting(false)
     }
 }
+
+/// The due date as choices rather than a labelled value: the two days that cover
+/// almost every task, plus a third chip that opens the calendar and then names
+/// whatever was picked. No section label — the choices are the label.
+private struct DuePickRow: View {
+    @Environment(TaskStore.self) private var store
+
+    var body: some View {
+        let picks = DuePicks.make(due: store.draft.due, due2: store.draft.due2, today: store.today)
+        // All three fit on one row, including the longest date the formatter can
+        // produce — DuePickRowTests guards that, since a wider format or more chip
+        // padding would start truncating dates silently.
+        HStack(spacing: 6) {
+            quick(picks)
+            other(picks)
+            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    private func quick(_ picks: DuePicks) -> some View {
+        Chip(title: "Heute", style: picks.selection == .today ? .selected : .neutral) {
+            store.setDue(store.today)
+        }
+        Chip(title: "Morgen", style: picks.selection == .tomorrow ? .selected : .neutral) {
+            store.setDue(store.today.adding(1))
+        }
+    }
+
+    private func other(_ picks: DuePicks) -> some View {
+        Chip(title: picks.otherLabel, style: picks.selection == .other ? .selected : .neutral) {
+            store.toggleCalendar()
+        }
+    }
+}
+
