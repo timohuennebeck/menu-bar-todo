@@ -46,6 +46,7 @@ Requires macOS 14+ and Xcode 15+ (built with Xcode 26.5 / Swift 6.3).
 
 ```sh
 Scripts/build-app.sh --run      # swift build -c release → build/MenuBarToDo.app, then launches it
+Scripts/build-app.sh --install  # same, then copies it to /Applications, adds it to Login Items and launches it
 ```
 
 Or open it in Xcode: `open Package.swift`, pick the *MenuBarToDo* scheme and run.
