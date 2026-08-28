@@ -120,6 +120,10 @@ final class PanelWindowController {
 
     // MARK: - Show / hide
 
+    /// The width the panel will open at: the last reported content width, or the design
+    /// width before the first layout pass.
+    private var panelWidth: CGFloat { contentSize.width > 0 ? contentSize.width : Theme.panelWidth }
+
     /// Shows the panel hanging from `anchor` (a screen rect, e.g. the status item button).
     func show(below anchor: NSRect) {
         isClosing = false
@@ -130,13 +134,13 @@ final class PanelWindowController {
             // Reopen where the user put it, nudged back on screen if the display changed.
             let screen = NSScreen.screens.first { $0.frame.contains(dragged) } ?? screen
             let bounds = screen?.visibleFrame ?? bounds
-            anchorTopRight = NSPoint(x: min(max(dragged.x, bounds.minX + Theme.panelWidth), bounds.maxX),
+            anchorTopRight = NSPoint(x: min(max(dragged.x, bounds.minX + panelWidth), bounds.maxX),
                                      y: min(max(dragged.y, bounds.minY + 100), bounds.maxY))
         } else {
             let top = min(anchor.minY, bounds.maxY) - PanelWindowController.topGap
             var right = anchor.maxX
             right = min(right, bounds.maxX - PanelWindowController.edgeInset)
-            right = max(right, bounds.minX + PanelWindowController.edgeInset + Theme.panelWidth)
+            right = max(right, bounds.minX + PanelWindowController.edgeInset + panelWidth)
             anchorTopRight = NSPoint(x: right, y: top)
         }
 
@@ -426,14 +430,23 @@ final class SurfaceView: NSView {
     /// view's current height (the static parts are seeded, so the layout stays stable).
     private func rebuildScene() {
         let hour = Calendar.current.component(.hour, from: Date())
-        let w = Int(Theme.panelWidth / SurfaceView.pixelSize)
+        let size = SurfaceView.sceneSize(forWidth: bounds.width)
         let total = Int((bounds.height / SurfaceView.pixelSize).rounded(.up))
-        scene = PixelScene(width: w, height: w * 10 / 16, totalHeight: total, kind: PixelScene.kind(forHour: hour))
+        scene = PixelScene(width: size.width, height: size.height, totalHeight: total, kind: PixelScene.kind(forHour: hour))
+    }
+
+    /// Scene cells for a panel `width` points wide. The landscape's height comes from the
+    /// *design* width, whatever the panel is resized to: widening only adds columns, so
+    /// the hills never outgrow the scene band and the computer keeps its size.
+    static func sceneSize(forWidth width: CGFloat) -> (width: Int, height: Int) {
+        let designW = Int(Theme.panelWidth / pixelSize)
+        return (Int(width / pixelSize), designW * 10 / 16)
     }
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        if let scene, Int((newSize.height / SurfaceView.pixelSize).rounded(.up)) != scene.totalH {
+        if let scene, Int((newSize.height / SurfaceView.pixelSize).rounded(.up)) != scene.totalH
+            || SurfaceView.sceneSize(forWidth: newSize.width).width != scene.W {
             rebuildScene()
             if timer != nil { tick() }
         }
@@ -477,7 +490,7 @@ final class SurfaceView: NSView {
         ctx.draw(image, in: CGRect(origin: .zero, size: size))
         if SurfaceView.beadGrid {
             // Same rect as the scene, so bead cell (x, y) lies exactly on scene pixel (x, y).
-            ctx.draw(beadOverlay(rows: scene.totalH), in: CGRect(origin: .zero, size: size))
+            ctx.draw(beadOverlay(cols: scene.W, rows: scene.totalH), in: CGRect(origin: .zero, size: size))
         }
         ctx.restoreGState()
         // Dark scrim from below the computer so the content (white text) stays readable
@@ -515,13 +528,14 @@ final class SurfaceView: NSView {
     /// after a resize. (`cacheDisplay` renders were always aligned, which is why the
     /// PNG dumps never showed it.) An image placed by rect is positioned in user space,
     /// exactly like the scene image it covers.
-    private var beadOverlayCache: (scale: CGFloat, rows: Int, image: CGImage)?
+    private var beadOverlayCache: (scale: CGFloat, cols: Int, rows: Int, image: CGImage)?
 
-    private func beadOverlay(rows: Int) -> CGImage {
+    private func beadOverlay(cols: Int, rows: Int) -> CGImage {
         let scale = window?.backingScaleFactor ?? 2
-        if let cached = beadOverlayCache, cached.scale == scale, cached.rows == rows { return cached.image }
+        if let cached = beadOverlayCache, cached.scale == scale, cached.cols == cols, cached.rows == rows {
+            return cached.image
+        }
         let cell = Int(SurfaceView.pixelSize * scale)
-        let cols = Int(Theme.panelWidth / SurfaceView.pixelSize)
         let width = cols * cell, height = rows * cell
         func context(_ w: Int, _ h: Int) -> CGContext {
             CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
@@ -539,7 +553,7 @@ final class SurfaceView: NSView {
             full.draw(stripImage, in: CGRect(x: 0, y: y * cell, width: width, height: cell))
         }
         let image = full.makeImage()!
-        beadOverlayCache = (scale, rows, image)
+        beadOverlayCache = (scale, cols, rows, image)
         return image
     }
 }
@@ -593,41 +607,62 @@ struct WindowDragArea: NSViewRepresentable {
     func updateNSView(_ nsView: DragView, context: Context) {}
 }
 
-/// Resize grip along the panel's bottom edge (the Fantastical pattern: a menu bar
-/// panel keeps its width, you drag the bottom to see more rows). Dragging sets
-/// PanelSettings.listMaxHeight; the window then follows the content like it does for
-/// any other content change, top-right anchored, so nothing here touches the frame.
+/// Resize grip along a panel edge (the Fantastical pattern: you drag the edge of a
+/// menu bar panel to see more). The panel hangs from its top-right corner, so the
+/// resizable edges are the bottom (list height), the left (width) and the corner
+/// between them; the anchor stays put. Dragging sets PanelSettings; the window then
+/// follows the content like it does for any other content change, so nothing here
+/// touches the frame.
 struct ResizeGripArea: NSViewRepresentable {
+    enum Edge {
+        case bottom, left, bottomLeft
+
+        var cursor: NSCursor {
+            switch self {
+            case .bottom: return .resizeUpDown
+            case .left: return .resizeLeftRight
+            // No public diagonal cursor; the corner is small and the edges say enough.
+            case .bottomLeft: return .crosshair
+            }
+        }
+    }
+
     /// Thickness of the invisible strip that takes the drag.
     static let thickness: CGFloat = 6
+    /// Side of the corner square, larger than the strips so it is hittable.
+    static let cornerSize: CGFloat = 14
 
     final class GripView: NSView {
-        var onDrag: ((CGFloat, CGFloat) -> Void)?
+        var cursor: NSCursor = .arrow
+        /// `(offset, room)`: how far the drag has come, positive = wider / taller, and the
+        /// room between the panel's top-right corner and the screen's bottom-left — the most
+        /// the whole panel may measure without leaving the screen.
+        var onDrag: ((CGSize, CGSize) -> Void)?
         var onDragEnded: (() -> Void)?
-        private var startY: CGFloat = 0
+        private var start: NSPoint = .zero
 
-        /// Points between the panel's top and the bottom of its screen — the most the
-        /// whole panel may be tall without leaving the screen.
-        private var room: CGFloat {
-            guard let window, let screen = window.screen else { return .infinity }
-            return window.frame.maxY - screen.visibleFrame.minY
+        private var room: CGSize {
+            guard let window, let screen = window.screen else { return CGSize(width: CGFloat.infinity, height: CGFloat.infinity) }
+            return CGSize(width: window.frame.maxX - screen.visibleFrame.minX,
+                          height: window.frame.maxY - screen.visibleFrame.minY)
         }
 
         /// Same reason as WindowDragArea: the panel is often clicked while inactive.
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
         override func resetCursorRects() {
-            addCursorRect(bounds, cursor: .resizeUpDown)
+            addCursorRect(bounds, cursor: cursor)
         }
 
         override func mouseDown(with event: NSEvent) {
-            startY = NSEvent.mouseLocation.y
+            start = NSEvent.mouseLocation
         }
 
         override func mouseDragged(with event: NSEvent) {
-            // Screen coordinates: the window moves under the pointer while it grows,
-            // so view-local positions would drift. Down on screen = larger list.
-            onDrag?(startY - NSEvent.mouseLocation.y, room)
+            // Screen coordinates: the window's left/bottom move under the pointer while it
+            // grows, so view-local positions would drift. Left / down on screen = larger.
+            let now = NSEvent.mouseLocation
+            onDrag?(CGSize(width: start.x - now.x, height: start.y - now.y), room)
         }
 
         override func mouseUp(with event: NSEvent) {
@@ -635,18 +670,19 @@ struct ResizeGripArea: NSViewRepresentable {
         }
     }
 
-    /// Called with the drag's total offset so far (points, positive = taller) and the
-    /// room between the panel's top and the bottom of its screen.
-    var onDrag: (CGFloat, CGFloat) -> Void
+    var edge: Edge
+    var onDrag: (CGSize, CGSize) -> Void
     var onDragEnded: () -> Void = {}
 
     func makeNSView(context: Context) -> GripView {
         let view = GripView()
+        view.cursor = edge.cursor
         view.onDrag = onDrag
         view.onDragEnded = onDragEnded
         return view
     }
     func updateNSView(_ nsView: GripView, context: Context) {
+        nsView.cursor = edge.cursor
         nsView.onDrag = onDrag
         nsView.onDragEnded = onDragEnded
     }

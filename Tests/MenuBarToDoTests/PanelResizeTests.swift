@@ -46,3 +46,45 @@ final class PanelResizeTests: XCTestCase {
         XCTAssertTrue(ResizeGripArea.GripView().acceptsFirstMouse(for: nil))
     }
 }
+
+final class PanelWidthTests: XCTestCase {
+    private func makeDefaults(_ name: String = #function) -> UserDefaults {
+        let defaults = UserDefaults(suiteName: "PanelWidthTests.\(name)")!
+        defaults.removePersistentDomain(forName: "PanelWidthTests.\(name)")
+        return defaults
+    }
+
+    func testWidthDefaultsToTheDesignWidth() {
+        XCTAssertEqual(PanelSettings(defaults: makeDefaults()).panelWidth, Theme.panelWidth)
+    }
+
+    func testWidthSurvivesAcrossInstances() {
+        let defaults = makeDefaults()
+        PanelSettings(defaults: defaults).panelWidth = 480
+        XCTAssertEqual(PanelSettings(defaults: defaults).panelWidth, 480)
+    }
+
+    func testStoredWidthBelowTheDesignIsIgnored() {
+        let defaults = makeDefaults()
+        defaults.set(100, forKey: "panelWidth")
+        XCTAssertEqual(PanelSettings(defaults: defaults).panelWidth, Theme.panelWidth)
+    }
+
+    /// Between the design width and the hard maximum, capped further by the screen.
+    func testClampKeepsTheWidthBetweenTheDesignAndTheRoom() {
+        XCTAssertEqual(PanelSettings.clampWidth(100, available: 1000), Theme.panelWidth)
+        XCTAssertEqual(PanelSettings.clampWidth(480, available: 1000), 480)
+        XCTAssertEqual(PanelSettings.clampWidth(900, available: 1000), PanelSettings.maxWidth)
+        XCTAssertEqual(PanelSettings.clampWidth(480, available: 300), Theme.panelWidth)
+        XCTAssertEqual(PanelSettings.clampWidth(480, available: 450), 450)
+    }
+
+    /// Widening only adds columns: the landscape keeps the height the design width gives
+    /// it, so the hills never outgrow the 150 pt band.
+    func testWiderSceneKeepsTheDesignHeight() {
+        let narrow = SurfaceView.sceneSize(forWidth: Theme.panelWidth)
+        let wide = SurfaceView.sceneSize(forWidth: 500)
+        XCTAssertEqual(wide.height, narrow.height)
+        XCTAssertGreaterThan(wide.width, narrow.width)
+    }
+}

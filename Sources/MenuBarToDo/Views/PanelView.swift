@@ -5,8 +5,8 @@ import SwiftUI
 struct PanelView: View {
     @Environment(TaskStore.self) private var store
     @Environment(PanelSettings.self) private var settings
-    /// List cap when the resize drag started; the drag offset is applied to this.
-    @State private var resizeStart: CGFloat?
+    /// Width and list cap when the resize drag started; the drag offset is applied to these.
+    @State private var resizeStart: (width: CGFloat, height: CGFloat)?
     /// Reports the panel's rendered size on every change (including each frame of
     /// a layout animation) so the popover window can follow it exactly.
     var onSizeChange: ((CGSize) -> Void)? = nil
@@ -49,6 +49,22 @@ struct PanelView: View {
     /// Height of everything below the scene band that isn't the list (list header +
     /// footer, generous), used only to keep the resized panel on screen.
     static let chromeBelowScene: CGFloat = 90
+
+    private func grip(_ edge: ResizeGripArea.Edge) -> some View {
+        ResizeGripArea(edge: edge, onDrag: { offset, room in
+            let start = resizeStart ?? (settings.panelWidth, settings.listMaxHeight)
+            resizeStart = start
+            if edge != .bottom {
+                settings.panelWidth = PanelSettings.clampWidth(
+                    start.width + offset.width, available: room.width - PanelWindowController.edgeInset)
+            }
+            if edge != .left {
+                settings.listMaxHeight = PanelSettings.clampListHeight(
+                    start.height + offset.height, available: PanelView.availableListHeight(room: room.height))
+            }
+        }, onDragEnded: { resizeStart = nil })
+        .help("Zum Vergrößern ziehen")
+    }
 
     private var panel: some View {
         VStack(spacing: 0) {
@@ -106,19 +122,19 @@ struct PanelView: View {
             }
             .padding(8)
         }
-        // Bottom edge: drag to let the list show more rows before it scrolls.
+        // Resize grips: bottom edge = more rows before the list scrolls, left edge =
+        // wider, the corner between them = both. Last, so they win over what is under them.
         .overlay(alignment: .bottom) {
-            ResizeGripArea(onDrag: { offset, room in
-                let start = resizeStart ?? settings.listMaxHeight
-                resizeStart = start
-                settings.listMaxHeight = PanelSettings.clampListHeight(
-                    start + offset, available: PanelView.availableListHeight(room: room))
-            }, onDragEnded: { resizeStart = nil })
-            .frame(height: ResizeGripArea.thickness)
-            .help("Zum Vergrößern ziehen")
+            grip(.bottom).frame(height: ResizeGripArea.thickness)
+        }
+        .overlay(alignment: .leading) {
+            grip(.left).frame(width: ResizeGripArea.thickness)
+        }
+        .overlay(alignment: .bottomLeading) {
+            grip(.bottomLeft).frame(width: ResizeGripArea.cornerSize, height: ResizeGripArea.cornerSize)
         }
         .environment(\.colorScheme, .dark)
-        .frame(width: Theme.panelWidth)
+        .frame(width: settings.panelWidth)
         .fixedSize(horizontal: false, vertical: true)
         // Clicking any non-interactive area (labels, padding, background) ends text editing,
         // like blurring an input on the web, and collapses the calendar — it is a popup and

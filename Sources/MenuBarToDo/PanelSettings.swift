@@ -8,6 +8,9 @@ import Foundation
 final class PanelSettings {
     private static let pinnedKey = "panelPinned"
     private static let listHeightKey = "panelListMaxHeight"
+    private static let widthKey = "panelWidth"
+    /// Wider than this a to-do list only gets long lines; also keeps the scene sane.
+    static let maxWidth: CGFloat = 600
 
     /// While pinned the panel stays open when focus moves elsewhere; only the
     /// status item, ⌃⌘T and Esc still close it (see PanelWindowController.dismisses).
@@ -21,6 +24,18 @@ final class PanelSettings {
     /// long ones get the extra rows. Never below the design's cap.
     var listMaxHeight: CGFloat {
         didSet { defaults.set(Double(listMaxHeight), forKey: PanelSettings.listHeightKey) }
+    }
+
+    /// Panel width. The panel hangs from its top-right corner, so the resize grip on
+    /// the *left* edge drags this and the anchor stays put. Never below the design width.
+    var panelWidth: CGFloat {
+        didSet { defaults.set(Double(panelWidth), forKey: PanelSettings.widthKey) }
+    }
+
+    /// Clamps a dragged width between the design width and the smaller of `maxWidth`
+    /// and the room left on screen; the design width wins if even that is less.
+    static func clampWidth(_ width: CGFloat, available: CGFloat) -> CGFloat {
+        max(Theme.panelWidth, min(width, maxWidth, available))
     }
 
     /// Clamps a dragged list height between the design cap and the room left on
@@ -37,5 +52,7 @@ final class PanelSettings {
         isPinned = defaults.bool(forKey: PanelSettings.pinnedKey)
         let stored = defaults.object(forKey: PanelSettings.listHeightKey) as? Double ?? 0
         listMaxHeight = max(Theme.listMaxHeight, CGFloat(stored))
+        let storedWidth = defaults.object(forKey: PanelSettings.widthKey) as? Double ?? 0
+        panelWidth = max(Theme.panelWidth, CGFloat(storedWidth))
     }
 }

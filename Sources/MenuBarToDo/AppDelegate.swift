@@ -47,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if env["MENUBAR_TODO_PREVIEW_POPOVER"] == "1", let frame = previewWindow?.frame {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                     guard let self else { return }
-                    let anchor = NSRect(x: frame.maxX + 40 + Theme.panelWidth, y: frame.maxY, width: 0, height: 0)
+                    let anchor = NSRect(x: frame.maxX + 40 + panelSettings.panelWidth, y: frame.maxY, width: 0, height: 0)
                     self.showPanel(below: anchor)
                     if let number = self.panel?.windowNumber {
                         print("POPOVER_WINDOW_ID=\(number)")

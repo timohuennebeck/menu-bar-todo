@@ -232,6 +232,7 @@ private struct RowView: View {
 /// 2×3 dot grip — the drag source for reordering.
 private struct DragHandle: View {
     @Environment(TaskStore.self) private var store
+    @Environment(PanelSettings.self) private var settings
     let task: TodoTask
 
     var body: some View {
@@ -252,7 +253,7 @@ private struct DragHandle: View {
             store.beginDrag(task.id)
             return NSItemProvider(object: task.id.uuidString as NSString)
         } preview: {
-            DragPreview(title: task.title)
+            DragPreview(title: task.title, width: settings.panelWidth - 40)
         }
     }
 }
@@ -260,6 +261,7 @@ private struct DragHandle: View {
 /// What follows the pointer while dragging: a compact card with the task title.
 private struct DragPreview: View {
     let title: String
+    let width: CGFloat
 
     var body: some View {
         Text(title)
@@ -268,7 +270,7 @@ private struct DragPreview: View {
             .lineLimit(1)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .frame(width: Theme.panelWidth - 40, alignment: .leading)
+            .frame(width: width, alignment: .leading)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08)))
             .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
