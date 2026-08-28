@@ -159,15 +159,14 @@ private struct DuePickRow: View {
 
 
 /// Delete in the edit form's header (the macOS convention: deleting belongs to the
-/// object, not the footer), drawn as the platform's "remove" glyph rather than a bin.
-/// One click deletes — no confirmation: a sheet out of a non-activating panel is
+/// object, not the footer). One click deletes — no confirmation: a sheet out of a non-activating panel is
 /// awkward, and a task is quickly recreated. Red on hover says it's destructive.
 private struct DeleteTaskButton: View {
     @Environment(TaskStore.self) private var store
     @State private var hovering = false
 
     var body: some View {
-        IconButton(systemImage: "minus.circle", help: "Aufgabe löschen", onScene: true,
+        IconButton(systemImage: "trash", help: "Aufgabe löschen", onScene: true,
                    glyph: hovering ? Theme.red : nil) {
             store.deleteEditingTask()
         }
