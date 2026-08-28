@@ -149,10 +149,13 @@ private struct RowView: View {
 
             Button(action: complete) {
                 ZStack {
-                    // Outline while open; hidden once checked so only the solid disc remains
-                    // (an outline on top of the disc would read as a darker ring).
+                    // Blue outline while open (always, so the check reads on the busy scene);
+                    // hidden once checked so only the solid disc remains (an outline on top
+                    // of the disc would read as a darker ring). Hover tints the inside.
                     Circle()
-                        .strokeBorder(checkHovering ? Theme.blue : Theme.line, lineWidth: 1.5)
+                        .fill(Theme.blue.opacity(checkHovering ? 0.18 : 0))
+                    Circle()
+                        .strokeBorder(Theme.blue, lineWidth: 1.5)
                         .opacity(completing ? 0 : 1)
                     Circle()
                         .fill(Theme.blue)

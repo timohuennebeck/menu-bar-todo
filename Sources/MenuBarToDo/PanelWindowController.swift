@@ -26,6 +26,15 @@ final class PanelWindowController {
     private var observers: [NSObjectProtocol] = []
     /// Top-right corner the panel hangs from (screen coordinates).
     private var anchorTopRight: NSPoint = .zero
+    /// Where the user last dragged the panel to (top-right, screen coordinates).
+    /// Once set, the panel reopens there instead of under the status item.
+    private var draggedTopRight: NSPoint? {
+        didSet {
+            guard let p = draggedTopRight else { return }
+            UserDefaults.standard.set([p.x, p.y], forKey: PanelWindowController.positionKey)
+        }
+    }
+    private static let positionKey = "panelTopRight"
     /// Last size PanelView reported; used to size the window before it is shown.
     private var contentSize: CGSize = .zero
     /// Latest shrink frame waiting for the coalesced apply (see `resize`).
@@ -72,6 +81,8 @@ final class PanelWindowController {
         window.level = .popUpMenu
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
+        // Not movable by background: that would swallow the rows' `.onDrag` reorder.
+        // The scene band at the top is the drag grip instead (WindowDragArea).
         window.isMovableByWindowBackground = false
         window.animationBehavior = .none
         window.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle, .fullScreenAuxiliary]
@@ -92,6 +103,10 @@ final class PanelWindowController {
             host.view.bottomAnchor.constraint(equalTo: effect.bottomAnchor)
         ])
         window.contentView = effect
+
+        if let saved = UserDefaults.standard.array(forKey: PanelWindowController.positionKey) as? [Double], saved.count == 2 {
+            draggedTopRight = NSPoint(x: saved[0], y: saved[1])
+        }
     }
 
     // MARK: - Show / hide
@@ -102,11 +117,19 @@ final class PanelWindowController {
         closeGeneration += 1 // a pending close completion must not hide this show
         let screen = NSScreen.screens.first { $0.frame.intersects(anchor) } ?? NSScreen.main
         let bounds = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let top = min(anchor.minY, bounds.maxY) - PanelWindowController.topGap
-        var right = anchor.maxX
-        right = min(right, bounds.maxX - PanelWindowController.edgeInset)
-        right = max(right, bounds.minX + PanelWindowController.edgeInset + Theme.panelWidth)
-        anchorTopRight = NSPoint(x: right, y: top)
+        if let dragged = draggedTopRight {
+            // Reopen where the user put it, nudged back on screen if the display changed.
+            let screen = NSScreen.screens.first { $0.frame.contains(dragged) } ?? screen
+            let bounds = screen?.visibleFrame ?? bounds
+            anchorTopRight = NSPoint(x: min(max(dragged.x, bounds.minX + Theme.panelWidth), bounds.maxX),
+                                     y: min(max(dragged.y, bounds.minY + 100), bounds.maxY))
+        } else {
+            let top = min(anchor.minY, bounds.maxY) - PanelWindowController.topGap
+            var right = anchor.maxX
+            right = min(right, bounds.maxX - PanelWindowController.edgeInset)
+            right = max(right, bounds.minX + PanelWindowController.edgeInset + Theme.panelWidth)
+            anchorTopRight = NSPoint(x: right, y: top)
+        }
 
         // Size to the content before the first frame is drawn. PanelView reports its size
         // from its first layout pass, which normally already happened when the hosting
@@ -253,6 +276,16 @@ final class PanelWindowController {
         }) {
             eventMonitors.append(local)
         }
+        // Dragged by the user: content-driven resizes must keep the new spot instead
+        // of snapping back under the status item.
+        observers.append(NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification,
+                                                                object: window, queue: .main) { [weak self] _ in
+            guard let self, self.pendingFrame == nil else { return } // our own coalesced setFrame
+            let topRight = NSPoint(x: self.window.frame.maxX, y: self.window.frame.maxY)
+            guard topRight != self.anchorTopRight else { return } // our resizes keep the top-right fixed
+            self.anchorTopRight = topRight
+            self.draggedTopRight = topRight
+        })
         // Cmd-Tab / another window of ours taking key status.
         observers.append(NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification,
                                                                 object: window, queue: .main) { [weak self] _ in
@@ -392,4 +425,16 @@ final class SurfaceView: NSView {
         ctx.fill(bounds)
         ctx.restoreGState()
     }
+}
+
+/// Drag grip for the panel: a mouse-down here moves the whole window. Placed over
+/// the scene band at the top so it never competes with the rows' reorder drag.
+struct WindowDragArea: NSViewRepresentable {
+    final class DragView: NSView {
+        override func mouseDown(with event: NSEvent) {
+            window?.performDrag(with: event)
+        }
+    }
+    func makeNSView(context: Context) -> DragView { DragView() }
+    func updateNSView(_ nsView: DragView, context: Context) {}
 }
