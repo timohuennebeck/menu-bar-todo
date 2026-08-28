@@ -15,6 +15,8 @@ final class PixelScene {
         var dk = "", md = "", lt = "", fl = "", fl2 = "", gr = ""
         var rk = "", rkd = "", bl = "", blL = "", mote = "", sh = ""
         var bd = "", bdL = "", bdH = "", bdD = "", bz = "", s1 = "", s2 = "", fc = ""
+        /// Body colours of the small second computer standing behind the main one.
+        var b2 = "", b2L = "", b2H = "", b2D = ""
         /// Underground (rows below the 16:10 scene): two dithered soil tones, root, pebble.
         var soil = ("#4a3221", "#3f2a1b"), root = "#8f6a45", rootD = "#66482c", pebble = "#6e655c"
     }
@@ -25,24 +27,28 @@ final class PixelScene {
             return Palette(sky: [(46, 152, 214), (176, 222, 240)], cl: ["#ffffff", "#bcdcef"], nC: 4,
                 dk: "#1f5c24", md: "#3d8a2a", lt: "#68b03a", fl: "#ffe95c", fl2: "#f5d431", gr: "#2e6d20",
                 rk: "#6c8290", rkd: "#4d616d", bl: "#2e6d20", blL: "#8ec93f", mote: "#fff6c0", sh: "#255a19",
-                bd: "#d9692b", bdL: "#e8813b", bdH: "#f5a45e", bdD: "#b84d1c", bz: "#a34a1f", s1: "#5b2a15", s2: "#4a2011", fc: "#f2913f")
+                bd: "#d9692b", bdL: "#e8813b", bdH: "#f5a45e", bdD: "#b84d1c", bz: "#a34a1f", s1: "#5b2a15", s2: "#4a2011", fc: "#f2913f",
+                b2: "#3f8fa8", b2L: "#57a9c0", b2H: "#8fd0e0", b2D: "#2c6a80")
         case .dusk:
             return Palette(sky: [(92, 52, 120), (250, 178, 110)], cl: ["#ffd9b0", "#cf8f8a"], nC: 4, sun: true,
                 dk: "#173d33", md: "#2c6446", lt: "#4f8a4a", fl: "#ffcf6b", fl2: "#f0a848", gr: "#1f4a33",
                 rk: "#6b5a70", rkd: "#493a52", bl: "#1f4a33", blL: "#7fa54a", mote: "#ffdca0", sh: "#183b2a",
                 bd: "#c85c2a", bdL: "#df7738", bdH: "#f0a05a", bdD: "#8f3a17", bz: "#8f3a17", s1: "#4d2415", s2: "#3a1a10", fc: "#ffb15c",
+                b2: "#3a7f97", b2L: "#4f98ad", b2H: "#7fc0d0", b2D: "#25596b",
                 soil: ("#3e2a1c", "#342216"), root: "#7c5a3c", rootD: "#563d27", pebble: "#5d5350")
         case .night:
             return Palette(sky: [(8, 14, 40), (38, 60, 100)], cl: ["#3a4a72", "#2a3557"], nC: 2, stars: true, moon: true,
                 dk: "#0f2a1a", md: "#193d24", lt: "#25532f", fl: "#9fd7ff", fl2: "#6fa8d6", gr: "#12331d",
                 rk: "#3a4656", rkd: "#252e3c", bl: "#12331d", blL: "#2c6b34", mote: "#d6ff8a", sh: "#0b2213",
                 bd: "#8a4020", bdL: "#a05128", bdH: "#c06a38", bdD: "#5c2712", bz: "#5c2712", s1: "#123a3c", s2: "#0d2a2c", fc: "#7fe6d8",
+                b2: "#27596b", b2L: "#336d82", b2H: "#4b8ea6", b2D: "#193c48",
                 soil: ("#241a12", "#1d140e"), root: "#5a412c", rootD: "#3e2c1b", pebble: "#3d3a3f")
         case .coast:
             return Palette(sky: [(74, 168, 214), (206, 236, 242)], cl: ["#ffffff", "#c6e2ef"], nC: 3, water: true,
                 dk: "#3f6b3a", md: "#5d8a3c", lt: "#8bb551", fl: "#f2e6a8", fl2: "#e8d488", gr: "#e6cf9c",
                 rk: "#8a8f92", rkd: "#646b6f", bl: "#5d8a3c", blL: "#a8c96a", mote: "#ffffff", sh: "#c9a76a",
                 bd: "#d9692b", bdL: "#e8813b", bdH: "#f5a45e", bdD: "#b84d1c", bz: "#a34a1f", s1: "#5b2a15", s2: "#4a2011", fc: "#f2913f",
+                b2: "#3f8fa8", b2L: "#57a9c0", b2H: "#8fd0e0", b2D: "#2c6a80",
                 soil: ("#8a7250", "#7a6444"), root: "#a8895e", rootD: "#8c7047", pebble: "#9c9a92")
         }
     }
@@ -329,36 +335,54 @@ final class PixelScene {
         }
     }
 
+    /// The retro computer. `scale` is relative to the main one; `cx` is its centre,
+    /// `groundY` where its base sits, `phase` offsets the bob and blink so two
+    /// computers don't move in lockstep.
+    private func computer(cx: Double, groundY: Double, scale: Double, phase: Double,
+                          body: (String, String, String, String), face: (String, String, String, String)) {
+        let Hd = Double(H)
+        let S = Hd / 170 * 1.16 * scale, bw = (56 * S).rounded(), bh = (62 * S).rounded()
+        let bx = (cx - bw / 2).rounded()
+        // Three-step bob (-1 / 0 / +1 px), shifted up one step so it never dips below the ground line.
+        let by = groundY - bh + (sin(t * 1.1 + phase) * S * 1.2).rounded() - S.rounded(), u = max(1, S.rounded())
+        let (bd, bdL, bdH, bdD) = body, (bz, s1, s2, fc) = face
+        if P.water { R(bx - (4 * S).rounded(), by + bh - (3 * S).rounded(), bw + (8 * S).rounded(), (4 * S).rounded(), P.sh) }
+        else { circ(cx, by + bh - (2 * S).rounded(), Int((bw * 0.46).rounded()), P.sh) }
+        rr(bx, by, bw, bh, (7 * S).rounded(), bd)
+        rr(bx, by, bw, (bh * 0.62).rounded(), (7 * S).rounded(), bdL)
+        R(bx + (2 * S).rounded(), by + (4 * S).rounded(), (2 * S).rounded(), bh - (12 * S).rounded(), bdH)
+        R(bx + bw - (4 * S).rounded(), by + (6 * S).rounded(), (3 * S).rounded(), bh - (16 * S).rounded(), bdD)
+        for i in 0..<3 { R(bx + bw - (9 * S).rounded(), by + ((15 + Double(i) * 4) * S).rounded(), (4 * S).rounded(), (2 * S).rounded(), bdD) }
+        let sx = bx + (6 * S).rounded(), sy = by + (6 * S).rounded(), sw2 = bw - (12 * S).rounded(), sh = (34 * S).rounded()
+        rr(sx, sy, sw2, sh, (5 * S).rounded(), bz)
+        rr(sx + u, sy + u, sw2 - 2 * u, sh - 2 * u, (4 * S).rounded(), s1)
+        rr(sx + 2 * u, sy + 2 * u, sw2 - 4 * u, sh - (5 * S).rounded(), (4 * S).rounded(), s2)
+        let bl = (t + phase).truncatingRemainder(dividingBy: 4.3) < 0.16
+        let eh = bl ? (2 * S).rounded() : (6 * S).rounded(), ey = sy + (11 * S).rounded() + (bl ? (2 * S).rounded() : 0)
+        R(sx + (9 * S).rounded(), ey, (7 * S).rounded(), eh, fc)
+        R(sx + sw2 - (16 * S).rounded(), ey, (7 * S).rounded(), eh, fc)
+        R(sx + (3 * S).rounded(), sy + (2 * S).rounded(), (3 * S).rounded(), (9 * S).rounded(), s1)
+        R(bx + bw / 2 - (5 * S).rounded(), by + (48 * S).rounded(), (10 * S).rounded(), u, bdD)
+        R(bx + bw / 2 - (5 * S).rounded(), by + (51 * S).rounded(), (10 * S).rounded(), u, bdD)
+    }
+
+    /// Main computer plus a smaller, differently coloured one peeking out behind it.
     private func mac() {
         let Wd = Double(W), Hd = Double(H)
-        let S = Hd / 170 * 1.16, bw = (56 * S).rounded(), bh = (62 * S).rounded()
-        let bx = (Wd / 2 - bw / 2).rounded()
-        let by = (Hd * 0.30).rounded() + (sin(t * 1.1) * S * 1.2).rounded(), u = max(1, S.rounded())
-        if P.water { R(bx - (4 * S).rounded(), by + bh - (3 * S).rounded(), bw + (8 * S).rounded(), (4 * S).rounded(), P.sh) }
-        else { circ(Wd / 2, by + bh - (2 * S).rounded(), Int((bw * 0.46).rounded()), P.sh) }
-        rr(bx, by, bw, bh, (7 * S).rounded(), P.bd)
-        rr(bx, by, bw, (bh * 0.62).rounded(), (7 * S).rounded(), P.bdL)
-        R(bx + (2 * S).rounded(), by + (4 * S).rounded(), (2 * S).rounded(), bh - (12 * S).rounded(), P.bdH)
-        R(bx + bw - (4 * S).rounded(), by + (6 * S).rounded(), (3 * S).rounded(), bh - (16 * S).rounded(), P.bdD)
-        for i in 0..<3 { R(bx + bw - (9 * S).rounded(), by + ((15 + Double(i) * 4) * S).rounded(), (4 * S).rounded(), (2 * S).rounded(), P.bdD) }
-        let sx = bx + (6 * S).rounded(), sy = by + (6 * S).rounded(), sw2 = bw - (12 * S).rounded(), sh = (34 * S).rounded()
-        rr(sx, sy, sw2, sh, (5 * S).rounded(), P.bz)
-        rr(sx + u, sy + u, sw2 - 2 * u, sh - 2 * u, (4 * S).rounded(), P.s1)
-        rr(sx + 2 * u, sy + 2 * u, sw2 - 4 * u, sh - (5 * S).rounded(), (4 * S).rounded(), P.s2)
-        let bl = t.truncatingRemainder(dividingBy: 4.3) < 0.16
-        let eh = bl ? (2 * S).rounded() : (6 * S).rounded(), ey = sy + (11 * S).rounded() + (bl ? (2 * S).rounded() : 0)
-        R(sx + (9 * S).rounded(), ey, (7 * S).rounded(), eh, P.fc)
-        R(sx + sw2 - (16 * S).rounded(), ey, (7 * S).rounded(), eh, P.fc)
-        let mw = Int((20 * S).rounded()), mx = sx + sw2 / 2 - Double(mw) / 2, my = sy + (24 * S).rounded(), th = max(1, (2 * S).rounded())
-        for i in 0..<mw {
-            // The HTML draws this arc the other way round (a frown); the scene is described
-            // as smiling, so the arc bows downwards here.
-            let yy = my + (sin(Double.pi * Double(i) / Double(mw - 1)) * 4.5 * S).rounded()
-            R(mx + Double(i), yy, 1, th, P.fc); R(mx + Double(i), yy + th, 1, u, P.bz)
-        }
-        R(sx + (3 * S).rounded(), sy + (2 * S).rounded(), (3 * S).rounded(), (9 * S).rounded(), P.s1)
-        R(bx + bw / 2 - (5 * S).rounded(), by + (48 * S).rounded(), (10 * S).rounded(), u, P.bdD)
-        R(bx + bw / 2 - (5 * S).rounded(), by + (51 * S).rounded(), (10 * S).rounded(), u, P.bdD)
+        let S = Hd / 170 * 1.16, ground = (Hd * 0.30).rounded() + (62 * S).rounded()
+        computer(cx: (Wd / 2 + 36 * S).rounded(), groundY: ground - (6 * S).rounded(), scale: 0.6, phase: 2.1,
+                 body: (P.b2, P.b2L, P.b2H, P.b2D), face: (P.b2D, "#12333c", "#0c262d", "#bff2ff"))
+        computer(cx: Wd / 2, groundY: ground, scale: 1, phase: 0, body: (P.bd, P.bdL, P.bdH, P.bdD), face: (P.bz, P.s1, P.s2, P.fc))
+        // Foreground bushes at the small one's feet so its base doesn't end in a hard line.
+        let fx = Wd / 2 + 36 * S, fy = ground - (12 * S).rounded()
+        // Back row (higher, darker) hides his lower body; front row reaches down to the grass line.
+        bush(Bush(x: fx - 20 * S, y: fy + 2 * S, r: Hd * 0.06, dark: true, ph: 0.9, f: nil))
+        bush(Bush(x: fx + 14 * S, y: fy + 2 * S, r: Hd * 0.055, dark: true, ph: 1.3, f: nil))
+        bush(Bush(x: fx - 4 * S, y: fy + 4 * S, r: Hd * 0.065, dark: false, ph: 2.9, f: (fx - 8 * S, fy)))
+        bush(Bush(x: fx + 26 * S, y: fy + 6 * S, r: Hd * 0.045, dark: false, ph: 0.4, f: nil))
+        bush(Bush(x: fx - 14 * S, y: ground - 2 * S, r: Hd * 0.06, dark: false, ph: 2.2, f: nil))
+        bush(Bush(x: fx + 6 * S, y: ground - 3 * S, r: Hd * 0.065, dark: true, ph: 3.6, f: (fx + 10 * S, ground - 8 * S)))
+        bush(Bush(x: fx + 24 * S, y: ground - 1 * S, r: Hd * 0.055, dark: false, ph: 1.7, f: nil))
     }
 
     /// Advances the animation to `time` (seconds) and returns the frame.
