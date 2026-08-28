@@ -209,8 +209,8 @@ struct PrimaryButton: View {
                 .foregroundStyle(enabled ? Theme.onAccent : .white.opacity(0.55))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
-                .background(enabled ? Theme.blue : Theme.blue.opacity(0.22), in: RoundedRectangle(cornerRadius: 9))
-                .contentShape(RoundedRectangle(cornerRadius: 9))
+                .background(enabled ? Theme.blue : Theme.blue.opacity(0.22), in: Capsule())
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         // A disabled button that still offers a pointer cursor reads as broken.
