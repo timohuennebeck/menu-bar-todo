@@ -210,9 +210,8 @@ struct PrimaryButton: View {
                 .contentShape(RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(.plain)
-        .pointerCursor()
-        // Not just dimmed: a hit-testable "disabled" button with a pointer cursor
-        // that swallows the click reads as broken.
+        // A disabled button that still offers a pointer cursor reads as broken.
+        .pointerCursor(enabled: enabled)
         .disabled(!enabled)
         .animation(.easeOut(duration: 0.12), value: enabled)
         .padding(.top, 2)
