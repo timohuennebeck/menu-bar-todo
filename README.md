@@ -25,7 +25,16 @@ animating content, coalesced to one frame update per display cycle so nothing ji
   fades out (0.2 s), then collapses to zero height (0.25 s, its group header too if it was the last row) and is removed only
   once invisible — no jump, no flicker. The collapse is an `Animatable` modifier so layout really interpolates and the panel
   window follows it frame by frame.
+- Behind the panel runs an animated pixel-art landscape (`PixelScene.swift`): two little computers that bob, blink,
+  follow the pointer and cheer when a task is ticked off. Nine scenes — Wiese, Goldene Stunde, Nacht, Küste, Regentag,
+  Mondbasis, Wüste, Herbstwald, Roter Planet — each with its own ground below the scene (roots where something grows,
+  rock strata where nothing does), starting in the scene's own colour and darkening with depth so the landscape never
+  ends in a line across the panel. The `app.background.dotted` button next to the pin steps to the next scene; white
+  means the clock is choosing (meadow by day, golden hour in the evening, night after that), mint that a scene was
+  picked by hand and kept (`panelScene`). Golden hour and night are the clock's alone and are not in that cycle.
+  Every frame is a function of elapsed time alone, so rebuilding the scene on a panel resize never makes the animation jump.
 - Drag tasks by their grip handle (the six dots); a single list-level drop target computes the slot from the pointer.
+- A row's circle carries its due date's colour: red when the task is overdue, mint when it is today's, grey further out.
 - Each row shows title, description (if any) and a due line — Todoist-style: Gestern / Heute / Morgen, the weekday
   ("Freitag") within the next six days, otherwise the date ("Do, 21. Aug"); ranges show their dates
   ("Mo, 24. – So, 30. Aug"), undated tasks "Kein Fälligkeitsdatum"; overdue red, today blue. The due date is optional — "Kein Datum" in the calendar popup removes it and the task
@@ -69,6 +78,8 @@ Sources/MenuBarToDo/
   Day.swift                        calendar-day value type ("yyyy-MM-dd" in JSON)
   Models.swift                     TodoTask / DoneTask, JSON persistence, design-time settings
   Labels.swift                     German date labels (port of the design's fmt / rangeText)
+  PanelSettings.swift              persisted panel chrome (pin, width, list height, scene)
+  PixelScene.swift                 animated pixel-art landscape behind the panel (nine scenes)
   Sound.swift                      synthesized completion chime (AVAudioEngine)
   TaskStore.swift                  @Observable store: tasks, routing, draft, drag state
   Views/Theme.swift                design tokens + shared controls (chips, buttons, insertion line)
@@ -82,6 +93,8 @@ Scripts/build-app.sh               assembles and ad-hoc signs the .app bundle
 Scripts/snapshot.sh                renders a single view to PNG (for visual checks)
 Scripts/capture-frames.sh          captures a burst of frames of the real panel while a debug route plays
 reference-web/                     faithful HTML/CSS/JS port of the design, kept as a pixel reference
+pixel_scene_variants.html          browser sketchpad: 16 landscape variants in the same renderer
+pixel_scene_picker_designs.html    browser mock-ups of the scene switcher + SF Symbol comparison
 ```
 
 ## Design-time options
