@@ -66,26 +66,17 @@ final class PanelSettings {
         }
     }
 
-    /// Steps the scene on by one. `hour` is what the clock would be showing.
-    func cycleScene(hour: Int = Calendar.current.component(.hour, from: Date())) {
-        scene = PanelSettings.scene(after: scene, clock: PixelScene.kind(forHour: hour))
+    /// Steps the scene on by one.
+    func cycleScene() {
+        scene = PanelSettings.scene(after: scene)
     }
 
-    /// The switcher's ring, rotated so it begins *after* the scene `clock` is showing:
-    /// `nil` → the next landscape → … → the clock's own one → `nil` again.
-    ///
-    /// Rotating rather than skipping is what makes both ends work. Stepping off "follow
-    /// the clock" straight onto the scene the clock already shows looked like a dead
-    /// button; simply skipping that entry instead put it out of reach for the rest of
-    /// the day (no way to pin the meadow at 9 a.m.). This way the first click always
-    /// changes the picture and every landscape still comes round.
-    static func scene(after current: PixelScene.Kind?, clock: PixelScene.Kind) -> PixelScene.Kind? {
-        let all = PixelScene.Kind.pickable
-        // In the evening and at night the clock's scene isn't in the ring at all, so
-        // there is nothing to rotate past — the ring simply starts at the front.
-        let start = all.firstIndex(of: clock).map { $0 + 1 } ?? 0
-        let ring: [PixelScene.Kind?] = (0..<all.count).map { all[(start + $0) % all.count] } + [nil]
-        let i = ring.firstIndex(of: current) ?? ring.count - 1
+    /// The switcher's ring: "follow the clock", then every landscape that isn't the
+    /// clock's. A stored scene that is no longer pickable (one that moved to the clock
+    /// in an update) starts the lap over rather than sitting on an entry that isn't there.
+    static func scene(after current: PixelScene.Kind?) -> PixelScene.Kind? {
+        let ring: [PixelScene.Kind?] = [nil] + PixelScene.Kind.pickable
+        let i = ring.firstIndex(of: current) ?? 0
         return ring[(i + 1) % ring.count]
     }
 

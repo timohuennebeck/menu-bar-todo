@@ -135,57 +135,59 @@ final class ScenePreferenceTests: XCTestCase {
         return PanelSettings(defaults: defaults)
     }
 
-    /// One button has to reach every scene and hand the choice back to the clock, or a
-    /// picked landscape would be a one-way door.
-    func testCyclingVisitsEverySceneOnceAndReturnsToTheClock() {
-        var seen: [PixelScene.Kind] = []
-        var current: PixelScene.Kind? = nil
-        for _ in 0..<PixelScene.Kind.pickable.count {
-            current = PanelSettings.scene(after: current, clock: .meadow)
-            seen.append(try! XCTUnwrap(current))
+    /// One button has to show every landscape and hand the choice back to the clock,
+    /// or a picked one would be a one-way door.
+    func testCyclingShowsEveryLandscapeAndReturnsToTheClock() {
+        let s = settings()
+        var shown: [PixelScene.Kind?] = []
+        for _ in 0..<(PixelScene.Kind.pickable.count + 1) {
+            s.cycleScene()
+            shown.append(s.scene)
         }
-        XCTAssertEqual(Set(seen), Set(PixelScene.Kind.pickable), "a scene cannot be reached")
-        XCTAssertEqual(seen.count, Set(seen).count, "a scene comes round twice")
-        XCTAssertNil(PanelSettings.scene(after: current, clock: .meadow),
-                     "the cycle never gets back to the clock")
+        XCTAssertEqual(Set(shown.compactMap { $0 }), Set(PixelScene.Kind.pickable), "a landscape is never shown")
+        XCTAssertEqual(shown.filter { $0 == nil }.count, 1, "the cycle never gets back to the clock, or does so twice")
+        XCTAssertEqual(shown.last, .some(nil), "the lap doesn't end on the clock")
     }
 
-    /// Golden hour and night are the clock's alone: pinning one would leave an evening
-    /// sky over the panel at ten in the morning.
+    /// The meadow, golden hour and night are the clock's alone: one landscape at three
+    /// times of day. Pinning golden hour would leave an evening sky over the panel at ten
+    /// in the morning, and pinning the meadow in the evening read as a duplicate of the
+    /// golden hour before it — the clock's own scene is never a step in the cycle.
     func testTheClocksOwnScenesCannotBePicked() {
+        let s = settings()
+        for _ in 0...PixelScene.Kind.pickable.count * 2 {
+            s.cycleScene()
+            if let k = s.scene { XCTAssertFalse(PixelScene.Kind.clocks.contains(k), "\(k) is the clock's") }
+        }
         for hour in [9, 18, 23] {
+            XCTAssertTrue(PixelScene.Kind.clocks.contains(PixelScene.kind(forHour: hour)), "hour \(hour)")
+        }
+    }
+
+    /// Every click has to change the picture — no two neighbours in the ring may paint
+    /// the same landscape, whatever the hour.
+    func testEveryClickChangesThePicture() {
+        for hour in [9, 18, 23] {
+            let clock = PixelScene.kind(forHour: hour)
             let s = settings()
-            for _ in 0...PixelScene.Kind.pickable.count * 2 {
-                s.cycleScene(hour: hour)
-                XCTAssertNotEqual(s.scene, .dusk)
-                XCTAssertNotEqual(s.scene, .night)
+            var shown = clock
+            for step in 0...PixelScene.Kind.pickable.count * 2 {
+                s.cycleScene()
+                let next = s.scene ?? clock
+                XCTAssertNotEqual(next, shown, "hour \(hour), step \(step): the panel looks the same afterwards")
+                shown = next
             }
         }
     }
 
-    /// The first click off "follow the clock" has to change the picture. Stepping onto
-    /// the scene the clock is already showing left the panel looking identical, which
-    /// read as a dead button.
-    func testTheFirstStepSkipsWhateverTheClockIsShowing() {
-        for hour in [9, 18, 23] {
-            let s = settings()
-            s.cycleScene(hour: hour)
-            XCTAssertNotEqual(s.scene, PixelScene.kind(forHour: hour), "hour \(hour): the first click changes nothing")
-        }
-    }
-
-    /// Skipping that one entry must not put a scene out of reach: keep clicking and
-    /// every landscape still comes round.
-    func testEverySceneIsStillReachableFromTheClock() {
-        for hour in [9, 18, 23] {
-            let s = settings()
-            var seen: Set<PixelScene.Kind> = []
-            for _ in 0...PixelScene.Kind.pickable.count * 2 {
-                s.cycleScene(hour: hour)
-                if let k = s.scene { seen.insert(k) }
-            }
-            XCTAssertEqual(seen, Set(PixelScene.Kind.pickable), "hour \(hour): a scene cannot be reached")
-        }
+    /// A stored scene that is no longer pickable (the meadow, pinned before it moved to
+    /// the clock) must not strand the button: the click still moves on.
+    func testAStoredSceneOffTheRingStillStepsOn() {
+        let s = settings()
+        s.scene = .meadow
+        s.cycleScene()
+        XCTAssertNotNil(s.scene)
+        XCTAssertNotEqual(s.scene, .meadow, "the click changes nothing")
     }
 
     /// The choice is a window preference: it has to survive a restart.

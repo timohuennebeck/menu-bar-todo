@@ -29,9 +29,10 @@ animating content, coalesced to one frame update per display cycle so nothing ji
   follow the pointer and cheer when a task is ticked off. Nine scenes — Wiese, Goldene Stunde, Nacht, Küste, Regentag,
   Mondbasis, Wüste, Herbstwald, Roter Planet — each with its own ground below the scene (roots where something grows,
   rock strata where nothing does), starting in the scene's own colour and darkening with depth so the landscape never
-  ends in a line across the panel. The `app.background.dotted` button next to the pin steps to the next scene; white
-  means the clock is choosing (meadow by day, golden hour in the evening, night after that), mint that a scene was
-  picked by hand and kept (`panelScene`). Golden hour and night are the clock's alone and are not in that cycle.
+  ends in a line across the panel. The `app.background.dotted` button next to the pin steps to the next scene; white means
+  the clock is choosing (meadow by day, golden hour in the evening, night after that), mint that a scene was picked
+  by hand and kept (`panelScene`). The clock's three are one landscape at three times of day and are not in that cycle —
+  "follow the clock" is the way to see them.
   Every frame is a function of elapsed time alone, so rebuilding the scene on a panel resize never makes the animation jump.
 - Drag tasks by their grip handle (the six dots); a single list-level drop target computes the slot from the pointer.
 - A row's circle carries its due date's colour: red when the task is overdue, mint when it is today's, grey further out.
@@ -41,6 +42,8 @@ animating content, coalesced to one frame update per display cycle so nothing ji
   lists last under "Kein Datum". The "Erledigt" list shows "Erledigt am …" and restores with one tap.
 - Tasks persist as JSON in `~/Library/Application Support/MenuBarToDo/tasks.json` (seeded with the design's sample
   data on first launch). A file that fails to load is moved aside as `tasks.corrupt-<timestamp>.json` — never overwritten.
+- In the add/edit form **⌘↩** saves, from anywhere in it — inside a field or after ↩ has left one (plain ↩ only ends
+  editing, so a wrapping title never takes a line break and a half-typed form is never filed by accident).
 - Global keyboard shortcuts (work from any app, no Accessibility permission needed): **⌃⌘T** shows/hides the panel,
   **⌃⌘N** opens it straight into *Task hinzufügen* (a form you are looking at is left alone). Registered via Carbon
   `RegisterEventHotKey` in `HotKey.swift`. Caveat: a global hotkey shadows the same shortcut in whichever app is

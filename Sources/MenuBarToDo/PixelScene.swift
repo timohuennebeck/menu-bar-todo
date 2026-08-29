@@ -9,10 +9,15 @@ final class PixelScene {
     enum Kind: String, CaseIterable {
         case meadow, dusk, night, coast, rain, moon, desert, autumn, mars
 
-        /// The scenes the switcher steps through. Golden hour and night are the clock's
-        /// own: pinning one would put an evening sky over the panel at ten in the
-        /// morning, which is exactly what "follow the clock" is for.
-        static var pickable: [Kind] { allCases.filter { $0 != .dusk && $0 != .night } }
+        /// The scenes the switcher steps through. The meadow, golden hour and night are
+        /// the clock's own — one landscape at three times of day, and "follow the clock"
+        /// is the way to see it. Pinning one would put an evening sky over the panel at
+        /// ten in the morning; pinning the meadow in the evening read as a duplicate of
+        /// the golden hour it followed.
+        static var pickable: [Kind] { allCases.filter { !clocks.contains($0) } }
+
+        /// What the clock chooses between (`kind(forHour:)`).
+        static let clocks: Set<Kind> = [.meadow, .dusk, .night]
 
         /// German name, for the button's tooltip.
         var label: String {
