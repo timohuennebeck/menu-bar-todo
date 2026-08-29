@@ -27,7 +27,13 @@ struct TaskFormView: View {
             .padding(EdgeInsets(top: 11, leading: 14, bottom: 10, trailing: 14))
 
             VStack(spacing: 10) {
-                TextField("Titel", text: $store.draft.title)
+                // Wraps instead of scrolling sideways. A single-line field hands a
+                // too-long string to AppKit's field editor, which lays it out in its
+                // own, wider rect than the static text — so the title jumped 5 pt left
+                // the moment the field took focus. Wrapped, both states share one
+                // layout, and a long title is readable while it is edited.
+                TextField("Titel", text: $store.draft.title, axis: .vertical)
+                    .lineLimit(1...3)
                     .textFieldStyle(.plain)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Theme.ink)
@@ -36,9 +42,14 @@ struct TaskFormView: View {
                     .background(fieldBackground(focused: titleFocused), in: RoundedRectangle(cornerRadius: 9))
                     .overlay(focusRing(titleFocused))
                     .focused($titleFocused)
-                    .onSubmit {
-                        store.submitDraft()
-                        if store.route == .add { titleFocused = true }
+                    // Return is not a save shortcut: saving belongs to the button below,
+                    // which is the only place that can tell "done typing" from "typing".
+                    // It ends editing instead, like clicking off the field — and never
+                    // reaches the field, which in a wrapping one would otherwise put a
+                    // hard line break into the title.
+                    .onKeyPress(.return) {
+                        titleFocused = false
+                        return .handled
                     }
                     .simultaneousGesture(TapGesture().onEnded { store.closeCalendar() })
 
