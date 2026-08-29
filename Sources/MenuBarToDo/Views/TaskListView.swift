@@ -144,6 +144,10 @@ private struct RowView: View {
     private var collapsing: Bool { store.isCollapsing(task.id) }
 
     var body: some View {
+        let due = DueLabel.row(for: task.due, task.due2, style: store.settings.dateFormat, today: store.today)
+        // The circle carries the same tone as the due line under it: red when the task
+        // is overdue, mint when it is today's, grey for everything further out.
+        let ring = Theme.tone(due.tone)
         HStack(alignment: .top, spacing: 8) {
             DragHandle(task: task)
                 .opacity(completing ? 0 : 1)
@@ -153,13 +157,15 @@ private struct RowView: View {
 
             Button(action: complete) {
                 ZStack {
-                    // Blue outline while open (always, so the check reads on the busy scene);
+                    // Outline while open (always, so the check reads on the busy scene);
                     // hidden once checked so only the solid disc remains (an outline on top
                     // of the disc would read as a darker ring). Hover tints the inside.
+                    // The disc and tick stay mint whatever the tone — ticking a task off
+                    // is the same good moment whether it was overdue or not.
                     Circle()
-                        .fill(Theme.blue.opacity(checkHovering ? 0.18 : 0))
+                        .fill(ring.opacity(checkHovering ? 0.18 : 0))
                     Circle()
-                        .strokeBorder(Theme.blue, lineWidth: 1.5)
+                        .strokeBorder(ring, lineWidth: 1.5)
                         .opacity(completing ? 0 : 1)
                     Circle()
                         .fill(Theme.blue)
@@ -197,7 +203,6 @@ private struct RowView: View {
                         .lineSpacing(2)
                         .lineLimit(2)
                 }
-                let due = DueLabel.row(for: task.due, task.due2, style: store.settings.dateFormat, today: store.today)
                 HStack(spacing: 4) {
                     Image(systemName: "calendar")
                         .font(.system(size: 10, weight: .medium))
