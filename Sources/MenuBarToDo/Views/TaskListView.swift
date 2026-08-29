@@ -239,9 +239,26 @@ private struct RowView: View {
 /// 2×3 dot grip — the drag source for reordering.
 private struct DragHandle: View {
     @Environment(TaskStore.self) private var store
-    @Environment(PanelSettings.self) private var settings
     let task: TodoTask
 
+    var body: some View {
+        GripDots()
+            .frame(height: 18)
+            .padding(.horizontal, 3)
+            .contentShape(Rectangle())
+            .grabCursor()
+            .help("Zum Verschieben ziehen")
+            .onDrag {
+                store.beginDrag(task.id)
+                return NSItemProvider(object: task.id.uuidString as NSString)
+            } preview: {
+                DragPreview()
+            }
+    }
+}
+
+/// The grip's 2×3 dots, shared by the row handle and the drag preview.
+private struct GripDots: View {
     var body: some View {
         VStack(spacing: 3) {
             ForEach(0..<3, id: \.self) { _ in
@@ -251,36 +268,18 @@ private struct DragHandle: View {
                 }
             }
         }
-        .frame(height: 18)
-        .padding(.horizontal, 3)
-        .contentShape(Rectangle())
-        .grabCursor()
-        .help("Zum Verschieben ziehen")
-        .onDrag {
-            store.beginDrag(task.id)
-            return NSItemProvider(object: task.id.uuidString as NSString)
-        } preview: {
-            DragPreview(title: task.title, width: settings.panelWidth - 40)
-        }
     }
 }
 
-/// What follows the pointer while dragging: a compact card with the task title.
+/// Nothing follows the pointer while dragging. A drag image hangs *outside* the window,
+/// so anything with substance to it — the row-wide card with the task title this used to
+/// be, or the grip on a chip — is carried across the desktop for the whole drag. The list
+/// already says everything: the source row dims and the insertion line marks where it
+/// lands. An empty preview would fall back to AppKit's own snapshot of the grip, so this
+/// is a transparent point instead.
 private struct DragPreview: View {
-    let title: String
-    let width: CGFloat
-
     var body: some View {
-        Text(title)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(Theme.ink)
-            .lineLimit(1)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(width: width, alignment: .leading)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.08)))
-            .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
+        Color.clear.frame(width: 1, height: 1)
     }
 }
 
