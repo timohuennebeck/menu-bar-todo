@@ -55,6 +55,10 @@ final class PixelScene {
         var b2 = "", b2L = "", b2H = "", b2D = ""
         /// Underground (rows below the 16:10 scene): two dithered soil tones, root, pebble.
         var soil = ("#4a3221", "#3f2a1b"), root = "#8f6a45", rootD = "#66482c", pebble = "#6e655c"
+        /// Surface speckle tones of bare ground, carried on into the soil below it so the
+        /// texture doesn't stop dead at the scene's last row (see `underground`). Unused
+        /// by the scenes that grow grass and bushes over the join.
+        var grain = ("", "")
         /// The two tones the scene's ground dithers with where it meets the soil below.
         /// Empty falls back to `(gr, dk)`, which is right wherever `dk` is the ground's
         /// own dark tone rather than a bush colour.
@@ -94,7 +98,7 @@ final class PixelScene {
                 bd: "#d9692b", bdL: "#e8813b", bdH: "#f5a45e", bdD: "#b84d1c", bz: "#a34a1f", s1: "#5b2a15", s2: "#4a2011", fc: "#f2913f",
                 b2: "#3f8fa8", b2L: "#57a9c0", b2H: "#8fd0e0", b2D: "#2c6a80",
                 soil: ("#b09877", "#a08768"), root: "#96794f", rootD: "#7d6340", pebble: "#8e8c84",
-                edge: ("#e6cf9c", "#d6bb85"), roots: false)
+                grain: ("#cfae74", "#f2e0b4"), edge: ("#e6cf9c", "#d6bb85"), roots: false)
         case .rain:
             // Same meadow, an hour into a downpour: the greens drop a step, the sky
             // and clouds go flat grey, and the body loses its highlight.
@@ -114,6 +118,7 @@ final class PixelScene {
                 bd: "#8a4020", bdL: "#a05128", bdH: "#c06a38", bdD: "#5c2712", bz: "#5c2712", s1: "#123a3c", s2: "#0d2a2c", fc: "#7fe6d8",
                 b2: "#27596b", b2L: "#336d82", b2H: "#4b8ea6", b2D: "#193c48",
                 soil: ("#46444c", "#3c3a42"), root: "#5a5560", rootD: "#443f4a", pebble: "#6e6c75",
+                grain: ("#55535b", "#6e6c75"), edge: ("#5d5b63", "#55535b"),
                 mode: .regolith, weather: .sparks, roots: false)
         case .desert:
             return Palette(sky: [(228, 150, 84), (250, 224, 176)], cl: ["#ffe9c8", "#eec79a"], nC: 2, sun: true,
@@ -122,7 +127,8 @@ final class PixelScene {
                 bd: "#d9692b", bdL: "#e8813b", bdH: "#f5a45e", bdD: "#b84d1c", bz: "#a34a1f", s1: "#5b2a15", s2: "#4a2011", fc: "#f2913f",
                 b2: "#3f8fa8", b2L: "#57a9c0", b2H: "#8fd0e0", b2D: "#2c6a80",
                 soil: ("#b59a70", "#a68b62"), root: "#98794f", rootD: "#7f653f", pebble: "#94866c",
-                edge: ("#cda468", "#c39a5f"), mode: .desert, weather: .dust, roots: false)
+                grain: ("#c39a5f", "#f0d9a6"), edge: ("#cda468", "#c39a5f"),
+                mode: .desert, weather: .dust, roots: false)
         case .mars:
             // Rust plain under a dust-scattered sky: mesas on the skyline, two small
             // moons, and a dust devil crossing. The body is a step brighter than the
@@ -133,6 +139,7 @@ final class PixelScene {
                 bd: "#e8813b", bdL: "#f59a52", bdH: "#ffbc7e", bdD: "#a8471a", bz: "#8f3a17", s1: "#3f1a10", s2: "#2c110a", fc: "#ffd08a",
                 b2: "#3f8fa8", b2L: "#57a9c0", b2H: "#8fd0e0", b2D: "#2c6a80",
                 soil: ("#7c4228", "#6b3821"), root: "#8f5535", rootD: "#6e3520", pebble: "#8f5c3c",
+                grain: ("#88462a", "#b06a44"), edge: ("#9c5433", "#93502f"),
                 mode: .mars, weather: .devil, roots: false)
         case .autumn:
             return Palette(sky: [(110, 150, 190), (236, 220, 190)], cl: ["#ffeed8", "#e2c9ae"], nC: 3,
@@ -554,6 +561,22 @@ final class PixelScene {
                 rect(sky, Double(x), Double(y), 1, 1)
             }
         }
+        // The meadow hides the join under grass, bushes and roots; bare ground has
+        // nothing growing over it, so its surface speckle carries on into the soil
+        // instead — same tones, thinning out and blending into the soil colour on the
+        // way down. Without this the baked texture stops dead at the scene's last row
+        // and the join reads as a hard line however well the colours match.
+        if !P.roots {
+            var rg = Rnd(93)
+            let fade = 44.0
+            for _ in 0..<(W * 2) {
+                let x = Double(Int(rg.next() * Wd))
+                let d = Int(fade * (1 - rg.next().squareRoot())) // densest at the seam
+                let tone = rgb(rg.next() < 0.5 ? P.grain.0 : P.grain.1)
+                sky.setFillColor(cg(lerp(tone, soil(d, dark: false), Double(d) / fade)))
+                rect(sky, x, Double(top + d), 1, 1)
+            }
+        }
         // Pebbles.
         var rp = Rnd(97)
         for _ in 0..<(PixelScene.groundDepth * W / 700) {
@@ -703,9 +726,18 @@ final class PixelScene {
         let by = groundY - bh + (sin(t * 1.1 + phase) * S * 1.2).rounded() - S.rounded() - hop, u = max(1, S.rounded())
         let (bd, bdL, bdH, bdD) = body, (bz, s1, s2, fc) = face
         // The shadow belongs to the ground, not to him, so the hop is added back out of it
-        // and it tightens a little while he is in the air. Always the round one: the flat
-        // bar the beach used read as a plank under his feet.
-        circ(cx, by + hop + bh - (2 * S).rounded(), Int((bw * 0.46 * (1 - 0.25 * sin(.pi * joy))).rounded()), P.sh)
+        // and it tightens a little while he is in the air.
+        let shR = bw * 0.46 * (1 - 0.25 * sin(.pi * joy))
+        let shY = by + hop + bh - (2 * S).rounded()
+        if P.mode == .land && !P.water {
+            // Grass and bushes swallow the shape here, so the round blob reads fine.
+            circ(cx, shY, Int(shR.rounded()), P.sh)
+        } else {
+            // Open ground shows the whole shadow, and a solid dark disc read as a hole
+            // in the sand. A flat pool instead — squashed, dither-edged so the ground's
+            // grain shows through — nudged off-centre when a sun hangs in the sky.
+            groundShadow(cx: cx + (P.sun ? shR * 0.3 : 0), y: shY, rx: shR)
+        }
         rr(bx, by, bw, bh, (7 * S).rounded(), bd)
         rr(bx, by, bw, (bh * 0.62).rounded(), (7 * S).rounded(), bdL)
         R(bx + (2 * S).rounded(), by + (4 * S).rounded(), (2 * S).rounded(), bh - (12 * S).rounded(), bdH)
@@ -752,6 +784,29 @@ final class PixelScene {
         R(sx + (3 * S).rounded(), sy + (2 * S).rounded(), (3 * S).rounded(), (9 * S).rounded(), s1)
         R(bx + bw / 2 - (5 * S).rounded(), by + (48 * S).rounded(), (10 * S).rounded(), u, bdD)
         R(bx + bw / 2 - (5 * S).rounded(), by + (51 * S).rounded(), (10 * S).rounded(), u, bdD)
+    }
+
+    /// Shadow on open ground: a flattened ellipse under the feet, solid at the core and
+    /// checker-dithered towards the rim so it reads as thin shade over the ground's own
+    /// texture rather than a stamped-out shape. (A solid bar was tried on the beach once
+    /// and read as a plank; the dithered rim is what keeps this from doing the same.)
+    private func groundShadow(cx: Double, y: Double, rx: Double) {
+        let ry = max(2, (rx * 0.16).rounded())
+        let icx = cx.rounded(), icy = y.rounded()
+        fill(ctx, P.sh)
+        var dy = -ry
+        while dy <= ry {
+            let w = (rx * (1 - dy * dy / (ry * ry + 1)).squareRoot()).rounded()
+            var dx = -w
+            while dx <= w {
+                let nx = dx / (rx * 0.68), ny = dy / (ry * 0.68 + 0.5)
+                if nx * nx + ny * ny <= 1 || (Int(icx + dx + icy + dy) & 1) == 0 {
+                    rect(ctx, icx + dx, icy + dy, 1, 1)
+                }
+                dx += 1
+            }
+            dy += 1
+        }
     }
 
     /// Main computer plus a smaller, differently coloured one peeking out behind it.
