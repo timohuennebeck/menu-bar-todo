@@ -69,3 +69,38 @@ final class AddButtonRouteTests: XCTestCase {
         XCTAssertFalse(PanelView.showsAddButton(for: .edit(UUID())))
     }
 }
+
+final class EscapeRouteTests: XCTestCase {
+    private func makeStore() -> TaskStore { TaskStore(persistence: nil) }
+
+    /// The done list is a page on top of the list, like the form: Esc goes back to
+    /// the list instead of closing the whole panel.
+    func testEscapeLeavesTheDoneList() {
+        let store = makeStore()
+        store.goDone()
+        XCTAssertTrue(store.handleEscape())
+        XCTAssertEqual(store.route, .list)
+    }
+
+    /// Unchanged: Esc in a form cancels it, keeping the panel open.
+    func testEscapeCancelsAForm() {
+        let store = makeStore()
+        store.openAdd()
+        store.draft.title = "halb getippt"
+        XCTAssertTrue(store.handleEscape())
+        XCTAssertEqual(store.route, .list)
+        XCTAssertEqual(store.draft.title, "")
+
+        let task = store.sortedItems[0]
+        store.openEdit(task)
+        XCTAssertTrue(store.handleEscape())
+        XCTAssertEqual(store.route, .list)
+    }
+
+    /// On the list itself there is nothing left to leave, so Esc closes the panel.
+    func testEscapeOnTheListIsNotHandled() {
+        let store = makeStore()
+        XCTAssertFalse(store.handleEscape())
+        XCTAssertEqual(store.route, .list)
+    }
+}

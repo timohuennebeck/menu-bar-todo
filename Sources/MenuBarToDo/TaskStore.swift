@@ -12,8 +12,8 @@ enum Route: Equatable {
         return false
     }
 
-    /// True while the add/edit form owns the panel — a state Esc must not clobber,
-    /// since it can hold half-typed input.
+    /// True while the add/edit form owns the panel — a state that can hold half-typed
+    /// input, so only a deliberate cancel (the ✕, Esc: see `handleEscape`) clears it.
     var isForm: Bool { self == .add || isEdit }
 }
 
@@ -236,6 +236,23 @@ final class TaskStore {
     func goDone() {
         pruneDone()
         route = .done
+    }
+
+    /// Esc inside the panel. The form and the done list are pages *on top of* the list,
+    /// so Esc leaves the page it is on first; only on the list itself is there nothing
+    /// left to leave and the panel closes (PanelWindowController). Returns whether the
+    /// key was dealt with here.
+    func handleEscape() -> Bool {
+        switch route {
+        case .add, .edit:
+            cancel()
+            return true
+        case .done:
+            goList()
+            return true
+        case .list:
+            return false
+        }
     }
 
     // MARK: - Done retention
