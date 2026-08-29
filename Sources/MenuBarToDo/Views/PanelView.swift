@@ -111,7 +111,10 @@ struct PanelView: View {
         // After the drag grip, so these get the click instead of starting a drag.
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 4) {
+                // A wider gap sets the scene chip (how the panel looks) apart from the
+                // pin/✕ pair (how the panel behaves).
                 SceneButton()
+                    .padding(.trailing, 6)
                 PinButton()
                 if let onClose {
                     // Closes the window whatever the pin says — the same door as the
