@@ -26,7 +26,10 @@ struct TodoTask: Identifiable, Codable, Equatable {
         id = try c.decode(UUID.self, forKey: .id)
         title = try c.decode(String.self, forKey: .title)
         details = try c.decodeIfPresent(String.self, forKey: .details) ?? ""
-        due = try c.decode(Day.self, forKey: .due)
+        // decodeIfPresent: the synthesized encoder drops the key entirely for an
+        // undated task, and a plain decode would throw — one "Kein Datum" task made
+        // the whole file unreadable on the next launch.
+        due = try c.decodeIfPresent(Day.self, forKey: .due)
         due2 = try c.decodeIfPresent(Day.self, forKey: .due2)
         createdAt = try c.decodeIfPresent(Day.self, forKey: .createdAt) ?? .today
     }

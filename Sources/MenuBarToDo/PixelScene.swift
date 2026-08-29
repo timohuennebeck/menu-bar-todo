@@ -518,8 +518,10 @@ final class PixelScene {
 
     /// How deep the soil takes to reach its base tone. Grass and bushes hide the join,
     /// so a dozen rows is plenty there; bare ground has nothing to hide behind, and any
-    /// step at all reads as the landscape being cut off — it fades over the whole panel.
-    private var soilFade: Double { P.roots ? Double(max(14, H / 6)) : Double(max(180, totalH - H)) }
+    /// step at all reads as the landscape being cut off — it fades over hundreds of
+    /// rows. A constant, not the panel height: deriving it from `totalH` re-tinted
+    /// every soil pixel on each resize (the same lesson as `groundDepth`).
+    private var soilFade: Double { P.roots ? Double(max(14, H / 6)) : Double(PixelScene.groundDepth) / 2 }
 
     private func rgb(_ hex: String) -> (Double, Double, Double) {
         var s = hex; s.removeFirst()

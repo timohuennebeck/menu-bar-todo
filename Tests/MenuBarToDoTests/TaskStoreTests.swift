@@ -191,6 +191,24 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertTrue(second.isCollapsed(monthGroups(second)[0]))
     }
 
+    /// A plain `decode` of the optional `due` threw on the key the encoder omits for
+    /// an undated task; `load()` then moved the file aside as corrupt and the app came
+    /// back empty. One "Kein Datum" task must not cost the user their whole list.
+    func testAnUndatedTaskSurvivesSaveAndReload() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("undated-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("tasks.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let persistence = Persistence(url: url)
+        persistence.save(Snapshot(items: [TodoTask(title: "Irgendwann")], done: []))
+
+        guard case .loaded(let snapshot) = persistence.load() else {
+            return XCTFail("the file with an undated task reads back as corrupt")
+        }
+        XCTAssertEqual(snapshot.items.first?.title, "Irgendwann")
+        XCTAssertNil(snapshot.items.first?.due)
+    }
+
     func testStaleCollapseKeysArePrunedOnSave() throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("collapse-\(UUID().uuidString)", isDirectory: true)
