@@ -404,12 +404,24 @@ final class SurfaceView: NSView {
     /// Scene time of the last check-off. Kept here rather than on the scene so that
     /// rebuilding the scene (any panel resize) doesn't restart or lose the cheer.
     private var celebratedAt: Double?
+    /// Rebuild trigger for a switched scene, kept for the view's lifetime.
+    private var sceneObserver: Any?
 
     func celebrate() { celebratedAt = CACurrentMediaTime() - started }
+
+    /// Picks up a changed scene preference without waiting for the next panel open.
+    func refreshScene() {
+        rebuildScene()
+        if timer != nil { tick() }
+    }
 
     override var isFlipped: Bool { true }
 
     func start() {
+        if sceneObserver == nil {
+            sceneObserver = NotificationCenter.default.addObserver(
+                forName: .panelSceneChanged, object: nil, queue: .main) { [weak self] _ in self?.refreshScene() }
+        }
         rebuildScene()
         started = CACurrentMediaTime()
         // `started` moves, so a stamp from the last time the panel was open would land
@@ -432,7 +444,9 @@ final class SurfaceView: NSView {
         let hour = Calendar.current.component(.hour, from: Date())
         let size = SurfaceView.sceneSize(forWidth: bounds.width)
         let total = Int((bounds.height / SurfaceView.pixelSize).rounded(.up))
-        scene = PixelScene(width: size.width, height: size.height, totalHeight: total, kind: PixelScene.kind(forHour: hour))
+        // A picked scene wins; without one the clock chooses.
+        let kind = PanelSettings.storedScene() ?? PixelScene.kind(forHour: hour)
+        scene = PixelScene(width: size.width, height: size.height, totalHeight: total, kind: kind)
     }
 
     /// Scene cells for a panel `width` points wide. The landscape's height comes from the

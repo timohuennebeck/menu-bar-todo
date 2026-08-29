@@ -111,6 +111,7 @@ struct PanelView: View {
         // After the drag grip, so these get the click instead of starting a drag.
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 4) {
+                SceneButton()
                 PinButton()
                 if let onClose {
                     // Closes the window whatever the pin says — the same door as the
@@ -186,6 +187,32 @@ struct PinButton: View {
               : "Anheften, damit das Fenster offen bleibt")
         .accessibilityLabel("Anheften")
         .accessibilityAddTraits(settings.isPinned ? [.isSelected] : [])
+    }
+}
+
+/// Switches the landscape behind the panel. Each click steps to the next one; after
+/// the last it hands the choice back to the clock. `app.background.dotted` has no
+/// filled variant, so the state is in the colour instead: mint means a scene was
+/// picked by hand, white that the clock still decides.
+struct SceneButton: View {
+    @Environment(PanelSettings.self) private var settings
+    @State private var hovering = false
+
+    var body: some View {
+        Button { settings.cycleScene() } label: {
+            Image(systemName: "app.background.dotted")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(settings.scene == nil ? SceneChip.glyph(hovering: hovering) : Theme.accent)
+                .frame(width: 22, height: 22)
+                .background(SceneChip.background(hovering: hovering), in: SceneChip.shape)
+                .contentShape(SceneChip.shape)
+        }
+        .buttonStyle(.plain)
+        .pointerCursor()
+        .onHover { hovering = $0 }
+        .help(settings.scene.map { "Landschaft: \($0.label) — weiter zur nächsten" }
+              ?? "Landschaft: nach Uhrzeit — weiter zur nächsten")
+        .accessibilityLabel("Landschaft wechseln")
     }
 }
 
