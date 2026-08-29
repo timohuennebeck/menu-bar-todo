@@ -8,7 +8,7 @@ final class PixelSceneTests: XCTestCase {
         return rep.representation(using: .png, properties: [:]) ?? Data()
     }
 
-    private let kinds: [PixelScene.Kind] = [.meadow, .dusk, .night, .coast]
+    private let kinds: [PixelScene.Kind] = PixelScene.Kind.allCases
 
     private func scene(_ kind: PixelScene.Kind) -> PixelScene {
         // The panel's real proportions: 330 pt wide at 2 pt per scene pixel, 16:10 scene,
@@ -128,3 +128,89 @@ final class CheerTriggerTests: XCTestCase {
     }
 }
 
+
+final class ScenePreferenceTests: XCTestCase {
+    private func settings() -> PanelSettings {
+        let defaults = UserDefaults(suiteName: "scene-tests-\(UUID().uuidString)")!
+        return PanelSettings(defaults: defaults)
+    }
+
+    /// One button has to reach every scene and hand the choice back to the clock, or a
+    /// picked landscape would be a one-way door.
+    func testCyclingVisitsEverySceneOnceAndReturnsToTheClock() {
+        var seen: [PixelScene.Kind] = []
+        var current: PixelScene.Kind? = nil
+        for _ in 0..<PixelScene.Kind.pickable.count {
+            current = PanelSettings.scene(after: current, clock: .meadow)
+            seen.append(try! XCTUnwrap(current))
+        }
+        XCTAssertEqual(Set(seen), Set(PixelScene.Kind.pickable), "a scene cannot be reached")
+        XCTAssertEqual(seen.count, Set(seen).count, "a scene comes round twice")
+        XCTAssertNil(PanelSettings.scene(after: current, clock: .meadow),
+                     "the cycle never gets back to the clock")
+    }
+
+    /// Golden hour and night are the clock's alone: pinning one would leave an evening
+    /// sky over the panel at ten in the morning.
+    func testTheClocksOwnScenesCannotBePicked() {
+        for hour in [9, 18, 23] {
+            let s = settings()
+            for _ in 0...PixelScene.Kind.pickable.count * 2 {
+                s.cycleScene(hour: hour)
+                XCTAssertNotEqual(s.scene, .dusk)
+                XCTAssertNotEqual(s.scene, .night)
+            }
+        }
+    }
+
+    /// The first click off "follow the clock" has to change the picture. Stepping onto
+    /// the scene the clock is already showing left the panel looking identical, which
+    /// read as a dead button.
+    func testTheFirstStepSkipsWhateverTheClockIsShowing() {
+        for hour in [9, 18, 23] {
+            let s = settings()
+            s.cycleScene(hour: hour)
+            XCTAssertNotEqual(s.scene, PixelScene.kind(forHour: hour), "hour \(hour): the first click changes nothing")
+        }
+    }
+
+    /// Skipping that one entry must not put a scene out of reach: keep clicking and
+    /// every landscape still comes round.
+    func testEverySceneIsStillReachableFromTheClock() {
+        for hour in [9, 18, 23] {
+            let s = settings()
+            var seen: Set<PixelScene.Kind> = []
+            for _ in 0...PixelScene.Kind.pickable.count * 2 {
+                s.cycleScene(hour: hour)
+                if let k = s.scene { seen.insert(k) }
+            }
+            XCTAssertEqual(seen, Set(PixelScene.Kind.pickable), "hour \(hour): a scene cannot be reached")
+        }
+    }
+
+    /// The choice is a window preference: it has to survive a restart.
+    func testThePickedSceneIsRemembered() {
+        let defaults = UserDefaults(suiteName: "scene-tests-\(UUID().uuidString)")!
+        let first = PanelSettings(defaults: defaults)
+        first.scene = .desert
+        XCTAssertEqual(PanelSettings(defaults: defaults).scene, .desert)
+        XCTAssertEqual(PanelSettings.storedScene(defaults: defaults), .desert)
+
+        first.scene = nil
+        XCTAssertNil(PanelSettings(defaults: defaults).scene)
+        XCTAssertNil(PanelSettings.storedScene(defaults: defaults), "the clock choice must not be stored")
+    }
+
+    /// The landscape is an AppKit view outside the observation graph, so a switch has
+    /// to announce itself or the panel keeps the old scene until it is reopened.
+    func testSwitchingTheSceneAnnouncesItself() {
+        let s = settings()
+        var posts = 0
+        let token = NotificationCenter.default.addObserver(forName: .panelSceneChanged, object: nil, queue: nil) { _ in
+            posts += 1
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+        s.cycleScene()
+        XCTAssertEqual(posts, 1)
+    }
+}
