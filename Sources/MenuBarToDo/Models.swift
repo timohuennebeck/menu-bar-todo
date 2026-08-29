@@ -132,13 +132,6 @@ enum DateFormatStyle: String {
     case absolute = "Absolut"
 }
 
-enum DropZoneStyle: String {
-    case insertionLine = "Einfügelinie"
-    case dashedFrame = "Gestrichelter Rahmen"
-    case header = "Kopfzeile"
-    case emptySlot = "Leerer Slot"
-}
-
 /// List filter chosen from the filter menu above the list.
 enum TaskFilter: String, CaseIterable, Identifiable {
     case none = "Kein Filter"
@@ -165,7 +158,6 @@ enum TaskFilter: String, CaseIterable, Identifiable {
 struct Settings {
     var dateFormat: DateFormatStyle = .relative
     var showDescriptions = true
-    var dropZoneStyle: DropZoneStyle = .insertionLine
     /// Play the chime when a task is checked off.
     var completionSound = true
 }

@@ -168,25 +168,18 @@ struct PanelView: View {
 /// the daytime sky.
 struct PinButton: View {
     @Environment(PanelSettings.self) private var settings
-    @State private var hovering = false
 
     var body: some View {
-        Button { settings.isPinned.toggle() } label: {
-            Image(systemName: settings.isPinned ? "pin.fill" : "pin")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(settings.isPinned ? .white : SceneChip.glyph(hovering: hovering))
-                .frame(width: 22, height: 22)
-                .background(SceneChip.background(hovering: hovering), in: SceneChip.shape)
-                .contentShape(SceneChip.shape)
+        IconButton(systemImage: settings.isPinned ? "pin.fill" : "pin",
+                   help: settings.isPinned
+                       ? "Angeheftet — bleibt offen (Esc oder ⌃⌘T schließt)"
+                       : "Anheften, damit das Fenster offen bleibt",
+                   onScene: true,
+                   glyph: settings.isPinned ? Color.white : nil,
+                   accessibilityText: "Anheften",
+                   isSelected: settings.isPinned) {
+            settings.isPinned.toggle()
         }
-        .buttonStyle(.plain)
-        .pointerCursor()
-        .onHover { hovering = $0 }
-        .help(settings.isPinned
-              ? "Angeheftet — bleibt offen (Esc oder ⌃⌘T schließt)"
-              : "Anheften, damit das Fenster offen bleibt")
-        .accessibilityLabel("Anheften")
-        .accessibilityAddTraits(settings.isPinned ? [.isSelected] : [])
     }
 }
 
@@ -196,23 +189,16 @@ struct PinButton: View {
 /// picked by hand, white that the clock still decides.
 struct SceneButton: View {
     @Environment(PanelSettings.self) private var settings
-    @State private var hovering = false
 
     var body: some View {
-        Button { settings.cycleScene() } label: {
-            Image(systemName: "app.background.dotted")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(settings.scene == nil ? SceneChip.glyph(hovering: hovering) : Theme.accent)
-                .frame(width: 22, height: 22)
-                .background(SceneChip.background(hovering: hovering), in: SceneChip.shape)
-                .contentShape(SceneChip.shape)
+        IconButton(systemImage: "app.background.dotted",
+                   help: settings.scene.map { "Landschaft: \($0.label) — weiter zur nächsten" }
+                       ?? "Landschaft: nach Uhrzeit — weiter zur nächsten",
+                   onScene: true,
+                   glyph: settings.scene == nil ? nil : Theme.accent,
+                   accessibilityText: "Landschaft wechseln") {
+            settings.cycleScene()
         }
-        .buttonStyle(.plain)
-        .pointerCursor()
-        .onHover { hovering = $0 }
-        .help(settings.scene.map { "Landschaft: \($0.label) — weiter zur nächsten" }
-              ?? "Landschaft: nach Uhrzeit — weiter zur nächsten")
-        .accessibilityLabel("Landschaft wechseln")
     }
 }
 
@@ -328,7 +314,7 @@ struct FooterView: View {
             // the done list. Inside it the header's ✕ is the way back, so the link
             // would lead where you already are.
             if store.route != .done {
-                LinkButton(title: "Erledigt (\(store.done.count))", kind: .muted) { store.goDone() }
+                LinkButton(title: "Erledigt (\(store.done.count))") { store.goDone() }
             }
         }
         .padding(.horizontal, 10)

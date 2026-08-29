@@ -41,8 +41,6 @@ final class PanelWindowController {
     private var pendingFrame: NSRect?
     private var applyScheduled = false
 
-    /// Called when the panel closed for any reason (outside click, Esc, …).
-    var onClose: (() -> Void)?
     /// Esc with no text field focused. Return true if it was dealt with (a form
     /// cancelled); false lets the panel close. It cannot be left to SwiftUI's
     /// onExitCommand: the first Esc resigns first responder, which takes the SwiftUI
@@ -198,7 +196,6 @@ final class PanelWindowController {
             self.window.orderOut(nil)
             self.window.alphaValue = 1
         })
-        onClose?()
     }
 
     /// A transient popover belongs above menus and popups; a *pinned* panel is a

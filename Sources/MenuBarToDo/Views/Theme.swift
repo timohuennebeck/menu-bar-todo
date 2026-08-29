@@ -10,8 +10,6 @@ enum Theme {
     static let blue = accent
     /// Text/icons drawn on top of a filled accent (deep teal, #173D33).
     static let onAccent = Color(red: 23 / 255, green: 61 / 255, blue: 51 / 255)
-    /// Soft mint (#BFD3CE) for tinted, inactive accent elements.
-    static let accentSoft = Color(red: 191 / 255, green: 211 / 255, blue: 206 / 255)
     static let red = Color(red: 255 / 255, green: 59 / 255, blue: 48 / 255)          // #FF3B30
 
     static let ink = Color(nsColor: .labelColor)                                     // #1D1D1F
@@ -122,8 +120,14 @@ struct IconButton: View {
     var tint: Color = Theme.muted
     var hoverTint: Color = Theme.ink
     var hoverBackground: Color = Theme.hoverBackground
-    /// Overrides the glyph colour in either style, hovering or not (the armed trash).
+    /// Overrides the glyph colour in either style, hovering or not — for the buttons
+    /// whose state is in the colour (the pin, the scene switcher).
     var glyph: Color? = nil
+    /// Read instead of `help` by VoiceOver, for buttons whose tooltip spells out the
+    /// current state ("Angeheftet — bleibt offen …") where a plain name is wanted.
+    var accessibilityText: String? = nil
+    /// Marks the button as on (the pin, while pinned).
+    var isSelected = false
     let action: () -> Void
 
     @State private var hovering = false
@@ -140,7 +144,8 @@ struct IconButton: View {
         .pointerCursor()
         .onHover { hovering = $0 }
         .help(help)
-        .accessibilityLabel(help)
+        .accessibilityLabel(accessibilityText ?? help)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     @ViewBuilder private var label: some View {
@@ -161,12 +166,9 @@ struct IconButton: View {
     }
 }
 
-/// Text-only footer link ("+ Todo hinzufügen", "Erledigt (2)").
+/// Quiet text-only link ("Erledigt (2)", "Kein Datum"): grey until hovered.
 struct LinkButton: View {
-    enum Kind { case accent, danger, muted }
-
     let title: String
-    var kind: Kind = .accent
     let action: () -> Void
 
     @State private var hovering = false
@@ -174,8 +176,8 @@ struct LinkButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 12, weight: kind == .muted ? .medium : .semibold))
-                .foregroundStyle(color)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(hovering ? Theme.ink : Theme.muted)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
                 .contentShape(Rectangle())
@@ -183,14 +185,6 @@ struct LinkButton: View {
         .buttonStyle(.plain)
         .pointerCursor()
         .onHover { hovering = $0 }
-    }
-
-    private var color: Color {
-        switch kind {
-        case .accent: return Theme.blue
-        case .danger: return Theme.red
-        case .muted: return hovering ? Theme.ink : Theme.muted
-        }
     }
 }
 

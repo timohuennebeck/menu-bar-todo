@@ -56,7 +56,7 @@ struct CalendarView: View {
                     .foregroundStyle(Theme.muted2)
                 Spacer(minLength: 0)
                 if store.draft.due != nil {
-                    LinkButton(title: "Kein Datum", kind: .muted) { store.clearDue() }
+                    LinkButton(title: "Kein Datum") { store.clearDue() }
                 }
                 if store.draft.due2 != nil {
                     IconButton(symbol: "↺", help: "Zurücksetzen",

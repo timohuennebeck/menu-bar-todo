@@ -167,7 +167,6 @@ final class PixelScene {
     /// bitmap height — any rows beyond `H` continue the ground with more grass and bushes.
     let W: Int, H: Int, totalH: Int
     let P: Palette
-    /// Colour of the underground, so the caller can extend the bitmap below its bottom edge.
     /// Colour of the soil at the bitmap's bottom edge, so the caller can extend the
     /// panel below it without a step.
     var groundColor: NSColor {
@@ -242,10 +241,8 @@ final class PixelScene {
     private var colors: [String: Col] = [:]
     private func color(_ hex: String) -> Col {
         if let c = colors[hex] { return c }
-        var s = hex; s.removeFirst()
-        let v = UInt32(s, radix: 16) ?? 0
-        let ns = NSColor(srgbRed: CGFloat((v >> 16) & 255) / 255, green: CGFloat((v >> 8) & 255) / 255,
-                         blue: CGFloat(v & 255) / 255, alpha: 1)
+        let (r, g, b) = rgb(hex)
+        let ns = NSColor(srgbRed: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: 1)
         let c = Col(cg: ns.cgColor, nsColor: ns)
         colors[hex] = c
         return c
@@ -571,10 +568,13 @@ final class PixelScene {
         if !P.roots {
             var rg = Rnd(93)
             let fade = 44.0
+            // Same fallback as `edge`: a palette with nothing growing but no speckle tones
+            // of its own degrades to the ground colours instead of tripping `rgb`'s parser.
+            let grain = P.grain.0.isEmpty ? (P.gr, P.rk) : P.grain
             for _ in 0..<(W * 2) {
                 let x = Double(Int(rg.next() * Wd))
                 let d = Int(fade * (1 - rg.next().squareRoot())) // densest at the seam
-                let tone = rgb(rg.next() < 0.5 ? P.grain.0 : P.grain.1)
+                let tone = rgb(rg.next() < 0.5 ? grain.0 : grain.1)
                 sky.setFillColor(cg(lerp(tone, soil(d, dark: false), Double(d) / fade)))
                 rect(sky, x, Double(top + d), 1, 1)
             }
@@ -703,16 +703,16 @@ final class PixelScene {
         }
     }
 
-    /// The retro computer. `scale` is relative to the main one; `cx` is its centre,
-    /// 0…1 over `cheerDuration` after a check-off, 0 otherwise. `delay` staggers the
-    /// small computer so the two don't fire in lockstep. One envelope drives the hop,
-    /// the squint and the screen flash together, so they cannot drift apart.
+    /// How far along the cheer is: 0…1 over `cheerDuration` after a check-off, 0
+    /// otherwise. `delay` staggers the small computer so the two don't fire in lockstep.
+    /// One envelope drives both the hop and the squint, so they cannot drift apart.
     private func cheer(delay: Double = 0) -> Double {
         guard let at = celebratedAt else { return 0 }
         let e = (t - at - delay) / PixelScene.cheerDuration
         return e > 0 && e < 1 ? e : 0
     }
 
+    /// The retro computer. `scale` is relative to the main one, `cx` is its centre and
     /// `groundY` where its base sits, `phase` offsets the bob and blink so two
     /// computers don't move in lockstep.
     private func computer(cx: Double, groundY: Double, scale: Double, phase: Double,
@@ -819,7 +819,7 @@ final class PixelScene {
                  body: (P.b2, P.b2L, P.b2H, P.b2D), face: (P.b2D, "#12333c", "#0c262d", "#bff2ff"))
         computer(cx: Wd / 2, groundY: ground, scale: 1, phase: 0, body: (P.bd, P.bdL, P.bdH, P.bdD), face: (P.bz, P.s1, P.s2, P.fc))
         // Foreground bushes at the small one's feet so its base doesn't end in a hard line.
-        // Bare-ground scenes have none: there the round shadow does that job on its own.
+        // Bare-ground scenes have none: there the flat dithered `groundShadow` covers the join.
         guard P.mode == .land else { return }
         let fx = Wd / 2 + 36 * S, fy = ground - (12 * S).rounded()
         // Back row (higher, darker) hides his lower body; front row reaches down to the grass line.

@@ -87,7 +87,7 @@ Sources/MenuBarToDo/
   TaskStore.swift                  @Observable store: tasks, routing, draft, drag state
   Views/Theme.swift                design tokens + shared controls (chips, buttons, insertion line)
   Views/PanelView.swift            root switch (list / add / edit / done) + footer + empty state
-  Views/TaskListView.swift         grouped list, drag & drop delegates, drop-zone styles
+  Views/TaskListView.swift         grouped list, drag & drop delegates, insertion line
   Views/TaskFormView.swift         add / edit form
   Views/CalendarView.swift         5-month scrolling calendar with range selection
   Views/DoneListView.swift         completed tasks
@@ -96,19 +96,21 @@ Scripts/build-app.sh               assembles and ad-hoc signs the .app bundle
 Scripts/snapshot.sh                renders a single view to PNG (for visual checks)
 Scripts/capture-frames.sh          captures a burst of frames of the real panel while a debug route plays
 reference-web/                     faithful HTML/CSS/JS port of the design, kept as a pixel reference
+pixel_computer_landscape_four_scenes.html  the landscape's original sketch (PixelScene.swift ports it)
 pixel_scene_variants.html          browser sketchpad: 16 landscape variants in the same renderer
 pixel_scene_picker_designs.html    browser mock-ups of the scene switcher + SF Symbol comparison
 ```
 
 ## Design-time options
 
-The `.dc.html` exposes three props; they live in `Settings` (`Models.swift`) and default to the design's defaults:
+The `.dc.html` exposes three props. Two of them live in `Settings` (`Models.swift`) at the design's
+defaults, joined by the app's own chime toggle; the third — the drop-zone style — is fixed here to the
+design's default, the insertion line.
 
 | Setting            | Values                                                              | Default        |
 |--------------------|---------------------------------------------------------------------|----------------|
 | `dateFormat`       | `.relative` ("Heute", "Fr.") / `.absolute` ("22. Aug")              | `.relative`    |
 | `showDescriptions` | `true` / `false`                                                    | `true`         |
-| `dropZoneStyle`    | `.insertionLine` / `.dashedFrame` / `.header` / `.emptySlot`        | `.insertionLine` |
 | `completionSound`  | `true` / `false`                                                    | `true`         |
 
 ## Debug helpers

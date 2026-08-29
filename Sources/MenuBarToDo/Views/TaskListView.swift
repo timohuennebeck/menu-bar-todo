@@ -44,7 +44,6 @@ private struct GroupView: View {
 
     @State private var headerHeight: CGFloat = 0
 
-    private var zone: DropZoneStyle { store.settings.dropZoneStyle }
     private var active: Bool { store.isGroupActive(group) }
     /// A collapsed group has no visible rows, so any hover over it is "the end".
     private var showsEndIndicator: Bool { store.showsGroupIndicator(group) || (collapsed && active) }
@@ -59,9 +58,9 @@ private struct GroupView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header (incl. the group's top padding) collapses together with its last row.
             // Label only, no divider line — but full width, so the whole strip is the
-            // click target of a month group and the "Kopfzeile" drop zone.
+            // click target of a month group.
             SectionLabel(text: collapsed ? "\(group.label.text) (\(group.rows.count))" : group.label.text,
-                         color: labelColor)
+                         color: Theme.tone(group.label.tone))
                 .fixedSize()
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(EdgeInsets(top: 8, leading: 14, bottom: 4, trailing: 14))
@@ -88,42 +87,15 @@ private struct GroupView: View {
                 .frame(height: 2)
                 .collapsible(collapsing, naturalHeight: 2)
         }
-        .overlay {
-            if zone == .dashedFrame {
-                RoundedRectangle(cornerRadius: 8)
-                    .inset(by: 2)
-                    .strokeBorder(active ? Theme.blue.opacity(0.6) : .clear,
-                                  style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-            }
-        }
         .overlay(alignment: .bottom) {
-            if zone == .insertionLine, showsEndIndicator {
+            if showsEndIndicator {
                 InsertionLine().padding(.trailing, 6)
-            }
-        }
-        .overlay(alignment: .bottom) {
-            if zone == .emptySlot, showsEndIndicator {
-                Text("Hierhin verschieben")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.blue)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 30)
-                    .background(Theme.accentSoft.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Theme.blue.opacity(0.45), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
-                    .padding(.horizontal, 6)
-                    .offset(y: 16)
-                    .allowsHitTesting(false)
             }
         }
         .zIndex(showsEndIndicator ? 1 : 0)
         .padding(.horizontal, 8)
         .animation(.easeOut(duration: 0.12), value: active)
         .reportFrame { GroupFramesKey.self } value: { [GroupFrame(id: group.id, frame: $0)] }
-    }
-
-    private var labelColor: Color {
-        zone == .header && active ? Theme.blue : Theme.tone(group.label.tone)
     }
 }
 
