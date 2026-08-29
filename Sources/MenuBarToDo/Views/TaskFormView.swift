@@ -42,11 +42,10 @@ struct TaskFormView: View {
                     .background(fieldBackground(focused: titleFocused), in: RoundedRectangle(cornerRadius: 9))
                     .overlay(focusRing(titleFocused))
                     .focused($titleFocused)
-                    // Return is not a save shortcut: saving belongs to the button below,
-                    // which is the only place that can tell "done typing" from "typing".
-                    // It ends editing instead, like clicking off the field — and never
-                    // reaches the field, which in a wrapping one would otherwise put a
-                    // hard line break into the title.
+                    // Plain Return is not a save shortcut: in a wrapping field it would
+                    // otherwise put a hard line break into the title, and one Return in
+                    // a two-field form can't tell "done typing" from "typing". It ends
+                    // editing instead, like clicking off the field. ⌘Return saves.
                     .onKeyPress(.return) {
                         titleFocused = false
                         return .handled
@@ -112,6 +111,10 @@ struct TaskFormView: View {
                     // next task gets typed instead of leaving focus on the button.
                     if store.route == .add { titleFocused = true }
                 }
+                // Saves from anywhere in the form — inside a field, or after Return has
+                // left one. The button is disabled until the draft is ready, and a
+                // disabled button's shortcut doesn't fire, so this can't save a blank one.
+                .keyboardShortcut(.return, modifiers: .command)
             }
             .padding(EdgeInsets(top: 0, leading: 14, bottom: 14, trailing: 14))
         }
